@@ -2,7 +2,7 @@
 
 ## Environment
 
-- Linux, an NVIDIA GPU, CUDA toolkit 12.x, CMake >= 3.24, a C++17 compiler, Python >= 3.10.
+- Linux, an NVIDIA GPU, CUDA toolkit 12.6 or newer (tested with 12.6, 12.8 and 13.1), CMake >= 3.24, a C++17 compiler, Python >= 3.10.
 - `utf8proc` headers and library when Qwen is enabled.
 - Optional: a nightly Rust `cargo` to link the gigatoken CPU engine (`-DGBPE_GIGATOKEN=AUTO|ON|OFF`).
 

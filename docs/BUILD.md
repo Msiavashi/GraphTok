@@ -2,7 +2,8 @@
 
 ## Requirements
 
-- CUDA toolkit 12.x, CMake >= 3.24, a C++17 host compiler.
+- CUDA toolkit 12.6 or newer (tested with 12.6, 12.8 and 13.1), CMake >= 3.24, a C++17 host compiler.
+- Tested GPUs: NVIDIA H100 NVL (sm_90), A100 80GB (sm_80), L40 (sm_89), RTX 5000 Ada (sm_89) and RTX A6000 (sm_86). The default build targets `80;90`; set `CMAKE_CUDA_ARCHITECTURES` (for example `86;89`) to add native code for other GPUs.
 - `utf8proc` when Qwen is enabled.
 - Optional nightly Rust `cargo` for the gigatoken CPU engine.
 - Python >= 3.10 with `scikit-build-core` and `pybind11` for the Python module.

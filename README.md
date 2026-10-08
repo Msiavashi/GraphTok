@@ -1,9 +1,13 @@
 # GraphTok
 
+[![Release](https://img.shields.io/github/v/release/Msiavashi/graphtok?label=release)](https://github.com/Msiavashi/graphtok/releases)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.3.0-green.svg)](CHANGELOG.md)
-[![CUDA 12.x](https://img.shields.io/badge/CUDA-12.x-76B900.svg)](docs/BUILD.md)
-[![Python >=3.10](https://img.shields.io/badge/python-%3E%3D3.10-blue.svg)](pyproject.toml)
+[![Python >=3.10](https://img.shields.io/badge/python-%E2%89%A53.10-3776AB.svg?logo=python&logoColor=white)](pyproject.toml)
+[![CUDA 12.6 | 12.8 | 13.1](https://img.shields.io/badge/CUDA-12.6%20%7C%2012.8%20%7C%2013.1-76B900.svg?logo=nvidia&logoColor=white)](docs/BUILD.md)
+[![Tested GPUs](https://img.shields.io/badge/tested%20GPUs-H100%20%7C%20A100%20%7C%20L40%20%7C%20RTX%205000%20Ada%20%7C%20RTX%20A6000-76B900.svg)](docs/BUILD.md)
+[![Platform: Linux](https://img.shields.io/badge/platform-Linux-lightgrey.svg?logo=linux&logoColor=white)](docs/BUILD.md)
+[![C++17](https://img.shields.io/badge/C%2B%2B-17-00599C.svg?logo=cplusplus&logoColor=white)](CMakeLists.txt)
+[![Integrations: vLLM | Dynamo](https://img.shields.io/badge/integrations-vLLM%20%7C%20NVIDIA%20Dynamo-orange.svg)](#integrations)
 
 GraphTok is a BPE tokenizer that runs end to end on an NVIDIA GPU. Pre-tokenization, BPE merging and output assembly are captured as one replayable CUDA graph, and token IDs are bit-identical to the reference tokenizers (`tiktoken` for GPT-2, Hugging Face `tokenizers` for the rest). Small inputs can be routed to a CPU engine, and a load-adaptive dispatcher batches concurrent requests into single graph replays. Repository: https://github.com/Msiavashi/graphtok.
 
@@ -28,7 +32,7 @@ The `all` preset (and `pip install .`) builds GPT-2, Llama 3, DeepSeek-V3 and Ge
 
 ## Quick start
 
-Requirements: Linux, an NVIDIA GPU, CUDA toolkit 12.x, CMake >= 3.24, a C++17 compiler, Python >= 3.10 (`utf8proc` when Qwen is enabled).
+Requirements: Linux, an NVIDIA GPU, CUDA toolkit 12.6 or newer (tested with 12.6, 12.8 and 13.1), CMake >= 3.24, a C++17 compiler, Python >= 3.10 (`utf8proc` when Qwen is enabled).
 
 ```bash
 git clone https://github.com/Msiavashi/graphtok.git && cd graphtok
