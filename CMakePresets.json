@@ -1,0 +1,98 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": { "major": 3, "minor": 24, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "_base",
+      "hidden": true,
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "generator": "Unix Makefiles",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_CUDA_ARCHITECTURES": "80;90"
+      }
+    },
+    {
+      "name": "all",
+      "displayName": "Default vocabs (Qwen excluded)",
+      "description": "GPT-2 + Llama-3 + DeepSeek-V3 + Gemma 3. Qwen is excluded until NFC normalization is GPU-resident.",
+      "inherits": "_base",
+      "cacheVariables": {
+        "GBPE_VOCABS": "ALL",
+        "GBPE_GEMMA_GPU_PRETOK": "ON"
+      }
+    },
+    {
+      "name": "gpt2",
+      "displayName": "GPT-2 only",
+      "description": "Smallest, fastest GPT-2-only build. Slot64-only kernel.",
+      "inherits": "_base",
+      "cacheVariables": { "GBPE_VOCABS": "GPT2" }
+    },
+    {
+      "name": "llama3",
+      "displayName": "Llama-3 only",
+      "description": "Llama-3-only build. Slot128-only kernel.",
+      "inherits": "_base",
+      "cacheVariables": { "GBPE_VOCABS": "LLAMA3" }
+    },
+    {
+      "name": "qwen25",
+      "displayName": "Qwen2.5 only",
+      "description": "Qwen2.5-only build. Slot128-only kernel.",
+      "inherits": "_base",
+      "cacheVariables": { "GBPE_VOCABS": "QWEN25" }
+    },
+    {
+      "name": "deepseek_v3",
+      "displayName": "DeepSeek-V3 only",
+      "description": "DeepSeek-V3 with three-pass pre-tokenizer. Slot128-only kernel.",
+      "inherits": "_base",
+      "cacheVariables": { "GBPE_VOCABS": "DEEPSEEK_V3" }
+    },
+    {
+      "name": "bytelevel",
+      "displayName": "All byte-level BPE",
+      "description": "GPT-2 + Llama-3 + Qwen2.5 + DeepSeek-V3, no Gemma 3.",
+      "inherits": "_base",
+      "cacheVariables": { "GBPE_VOCABS": "GPT2;LLAMA3;QWEN25;DEEPSEEK_V3" }
+    },
+    {
+      "name": "gemma3",
+      "displayName": "Gemma 3, GPU pre-tokenizer",
+      "description": "Gemma 3 with graph-resident normalization, initial IDs, fallback, and bucketing.",
+      "inherits": "_base",
+      "cacheVariables": {
+        "GBPE_VOCABS": "GEMMA3",
+        "GBPE_GEMMA_GPU_PRETOK": "ON"
+      }
+    },
+    {
+      "name": "gemma3_cpu",
+      "displayName": "Gemma 3, CPU pre-tokenizer",
+      "description": "Gemma 3 comparison build with the original host SPPreTokenizer.",
+      "inherits": "_base",
+      "cacheVariables": {
+        "GBPE_VOCABS": "GEMMA3",
+        "GBPE_GEMMA_GPU_PRETOK": "OFF"
+      }
+    },
+    {
+      "name": "gemma3_gpu",
+      "displayName": "Gemma 3, GPU pre-tokenizer (compatibility alias)",
+      "description": "Compatibility alias for the default gemma3 GPU-pretokenizer build.",
+      "inherits": "gemma3"
+    }
+  ],
+  "buildPresets": [
+    { "name": "all",         "configurePreset": "all" },
+    { "name": "gpt2",        "configurePreset": "gpt2" },
+    { "name": "llama3",      "configurePreset": "llama3" },
+    { "name": "qwen25",      "configurePreset": "qwen25" },
+    { "name": "deepseek_v3", "configurePreset": "deepseek_v3" },
+    { "name": "bytelevel",   "configurePreset": "bytelevel" },
+    { "name": "gemma3",      "configurePreset": "gemma3" },
+    { "name": "gemma3_cpu",  "configurePreset": "gemma3_cpu" },
+    { "name": "gemma3_gpu",  "configurePreset": "gemma3_gpu" }
+  ]
+}

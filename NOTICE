@@ -1,0 +1,23 @@
+cuTokenize
+Copyright 2026 the cuTokenize contributors
+
+This product is licensed under the Apache License, Version 2.0.
+See LICENSE for the full license text.
+
+Bundled third-party software
+----------------------------
+
+- third_party/rs-gigatoken
+  gigatoken 0.10.0 -- MIT License, Copyright (c) 2026 Marcel Rød.
+  Includes the OpenAI GPT-2 tokenizer fixture -- MIT License,
+  Copyright (c) 2019 OpenAI.
+  See third_party/rs-gigatoken/LICENSE.
+
+- third_party/nlohmann/json.hpp
+  JSON for Modern C++ -- MIT License, Copyright (c) Niels Lohmann.
+
+Model tokenizer files
+---------------------
+
+Model tokenizer.json files are downloaded by scripts/download-vocabs.py and
+are not redistributed with this project.

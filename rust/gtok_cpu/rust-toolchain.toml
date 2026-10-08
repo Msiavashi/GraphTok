@@ -1,0 +1,5 @@
+# rs-gigatoken needs nightly (#![feature(portable_simd)]). Built and verified
+# with rustc 1.99.0-nightly (ad3d0bc14 2026-07-31); CMake records the rustc
+# version it used next to the archive.
+[toolchain]
+channel = "nightly"

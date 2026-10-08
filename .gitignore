@@ -1,0 +1,60 @@
+
+# Benchmark corpus (downloaded, not tracked)
+# Build artifacts
+# Editor / OS
+# Local caches
+# Model weights / tokenizer blobs
+# Python
+# Vendor sources (cloned, not tracked)
+*.a
+*.bin
+*.dylib
+*.egg-info/
+*.gguf
+*.o
+*.pyc
+*.safetensors
+*.so
+.DS_Store
+.cache/
+.idea/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.venv/
+.vscode/
+/build
+__pycache__/
+build*/
+build/
+data/
+third_party/*
+# ...except the vendored build dependencies, which must ship in the repo so a
+# fresh clone builds without external setup: nlohmann/json (single header) and
+# rs-gigatoken 0.10.0 (the CPU route engine, see rust/gtok_cpu).
+!third_party/nlohmann/
+!third_party/nlohmann/json.hpp
+!third_party/rs-gigatoken/
+venv/
+
+
+# Paper sources, figures, and build artifacts (not part of the published repo)
+paper/
+
+# Local experiment workspace: paper benchmark runs, evaluation outputs, and
+# vendored competitor checkouts used for head-to-head measurement. Kept out of
+# the published repo -- tmp-baselines/ in particular holds third-party clones
+# (TokTier, GPUTok) that are not ours to redistribute.
+evaluation/
+experiments/
+tmp-baselines/
+rust/gtok_cpu/target/
+
+# Release: private material, local runtime artifacts
+private/
+*.pid
+*.pkl
+*.nsys-rep
+*.sqlite
+.claude/
+.superpowers/

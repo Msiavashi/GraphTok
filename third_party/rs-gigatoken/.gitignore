@@ -1,0 +1,15 @@
+# Rust
+/target/
+**/*.rs.bk
+
+# RustRover / IDEs
+.idea/
+.vscode/
+
+# Profiling / generated traces
+*.pdb
+*.trace/
+
+# Local benchmark data
+/data/
+.DS_Store

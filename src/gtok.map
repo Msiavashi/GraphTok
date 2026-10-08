@@ -1,0 +1,7 @@
+/* libgtok.so exports only its C ABI; everything else (CUDA stubs, C++
+   internals, the statically linked Rust CPU engine) stays local, so hosts
+   that are themselves C++ or Rust processes see no symbol clashes. */
+{
+  global: gtok_*;
+  local: *;
+};

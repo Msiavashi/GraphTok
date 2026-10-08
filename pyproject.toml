@@ -1,0 +1,43 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 the cuTokenize contributors
+
+[build-system]
+requires = ["scikit-build-core>=0.8", "pybind11>=2.12"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "gpu_bpe_tokenizer"
+version = "0.3.0"
+description = "cuTokenize — GPU-accelerated BPE tokenizer (CUDA) with Python bindings"
+readme = "README.md"
+license = { text = "Apache-2.0" }
+requires-python = ">=3.10"
+authors = [{ name = "cuTokenize contributors" }]
+classifiers = [
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: C++",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Environment :: GPU :: NVIDIA CUDA",
+    "Operating System :: POSIX :: Linux",
+]
+dependencies = [
+    "numpy>=1.20",
+]
+
+[project.optional-dependencies]
+vllm = ["vllm", "transformers"]
+test = ["pytest", "tiktoken>=0.13.0", "tokenizers>=0.23.1", "numpy"]
+
+[project.entry-points."vllm.general_plugins"]
+graphtok = "gpu_bpe_tokenizer.vllm:register"
+
+[tool.scikit-build]
+minimum-version = "0.8"
+build-dir = "build/{wheel_tag}"
+cmake.build-type = "Release"
+cmake.args = ["-DGBPE_BUILD_PYTHON=ON", "-DGBPE_VOCABS=ALL"]
+wheel.packages = ["python/gpu_bpe_tokenizer"]
+wheel.install-dir = "gpu_bpe_tokenizer"
+# Compiled module is installed into gpu_bpe_tokenizer/ via the CMake install rule.
+install.components = []

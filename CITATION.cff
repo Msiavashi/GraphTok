@@ -1,0 +1,38 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "cuTokenize"
+repository-code: "https://github.com/Msiavashi/graphtok"
+license: Apache-2.0
+authors:
+  - family-names: Siavashi
+    given-names: Mohammad
+  - family-names: Schwinte
+    given-names: Pascal
+  - family-names: Banaei
+    given-names: Ali
+  - family-names: Maguire
+    given-names: Gerald Q.
+    name-suffix: Jr.
+  - family-names: Chiesa
+    given-names: Marco
+  - family-names: Kostić
+    given-names: Dejan
+preferred-citation:
+  type: generic
+  title: "Taking Tokenization off the Host for Agentic LLM Serving"
+  year: 2026
+  notes: "arXiv preprint"
+  authors:
+    - family-names: Siavashi
+      given-names: Mohammad
+    - family-names: Schwinte
+      given-names: Pascal
+    - family-names: Banaei
+      given-names: Ali
+    - family-names: Maguire
+      given-names: Gerald Q.
+      name-suffix: Jr.
+    - family-names: Chiesa
+      given-names: Marco
+    - family-names: Kostić
+      given-names: Dejan

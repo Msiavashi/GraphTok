@@ -1,0 +1,486 @@
+diff --git a/Cargo.lock b/Cargo.lock
+index 35cbcc8..361943a 100644
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -2811,6 +2811,7 @@ dependencies = [
+  "base64 0.22.1",
+  "blake3",
+  "fastokens",
++ "libloading 0.8.9",
+  "moka",
+  "rayon",
+  "rustc-hash 1.1.0",
+diff --git a/components/src/dynamo/frontend/frontend_args.py b/components/src/dynamo/frontend/frontend_args.py
+index 65982cf..7d81a91 100644
+--- a/components/src/dynamo/frontend/frontend_args.py
++++ b/components/src/dynamo/frontend/frontend_args.py
+@@ -86,7 +86,7 @@ class FrontendConfig(RouterConfigBase, KvRouterConfigBase, AicPerfConfigBase):
+     tokenizer_backend: str
+     trust_remote_code: bool
+ 
+-    _VALID_TOKENIZER_BACKENDS = {"default", "fastokens"}
++    _VALID_TOKENIZER_BACKENDS = {"default", "fastokens", "graphtok"}
+ 
+     def validate(self) -> None:
+         if self.load_aware:
+@@ -480,11 +480,12 @@ class FrontendArgGroup(ArgGroup):
+             default="default",
+             dest="tokenizer_backend",
+             help=(
+-                "Tokenizer backend for BPE models: 'default' (HuggingFace tokenizers library) "
+-                "or 'fastokens' (fastokens crate for high-performance BPE encoding). "
++                "Tokenizer backend for BPE models: 'default' (HuggingFace tokenizers library), "
++                "'fastokens' (fastokens crate for high-performance BPE encoding), or "
++                "'graphtok' (GraphTok GPU tokenizer via libgtok.so; see DYN_GRAPHTOK_*). "
+                 "Decoding always uses HuggingFace. Has no effect on TikToken models."
+             ),
+-            choices=["default", "fastokens"],
++            choices=["default", "fastokens", "graphtok"],
+         )
+ 
+         add_negatable_bool_argument(
+diff --git a/components/src/dynamo/frontend/main.py b/components/src/dynamo/frontend/main.py
+index 875dae9..ac2495e 100644
+--- a/components/src/dynamo/frontend/main.py
++++ b/components/src/dynamo/frontend/main.py
+@@ -179,8 +179,8 @@ async def async_main():
+     dump_config(config.dump_config_to, config)
+     if config.event_plane:
+         os.environ["DYN_EVENT_PLANE"] = config.event_plane
+-    if config.tokenizer_backend == "fastokens":
+-        os.environ["DYN_TOKENIZER"] = "fastokens"
++    if config.tokenizer_backend in ("fastokens", "graphtok"):
++        os.environ["DYN_TOKENIZER"] = config.tokenizer_backend
+     else:
+         os.environ.pop("DYN_TOKENIZER", None)
+     max_seq_info = (
+diff --git a/lib/bindings/python/Cargo.lock b/lib/bindings/python/Cargo.lock
+index 86ab803..d28050e 100644
+--- a/lib/bindings/python/Cargo.lock
++++ b/lib/bindings/python/Cargo.lock
+@@ -2439,6 +2439,7 @@ dependencies = [
+  "base64 0.22.1",
+  "blake3",
+  "fastokens",
++ "libloading 0.8.9",
+  "moka",
+  "rayon",
+  "rustc-hash 1.1.0",
+diff --git a/lib/llm/src/model_card.rs b/lib/llm/src/model_card.rs
+index 4f0215b..7ed181b 100644
+--- a/lib/llm/src/model_card.rs
++++ b/lib/llm/src/model_card.rs
+@@ -933,6 +933,8 @@ impl ModelDeploymentCard {
+     ///
+     /// Env-var controls:
+     /// - `DYN_TOKENIZER=fastokens` — use `fastokens` as the encoding backend
++    /// - `DYN_TOKENIZER=graphtok` — use the GraphTok GPU tokenizer (`libgtok.so`) as the
++    ///   encoding backend; see `dynamo_tokenizers::graphtok` for its `DYN_GRAPHTOK_*` knobs
+     /// - `DYN_TOKENIZER_CACHE=1` — wrap the tokenizer in an L1 prefix cache that records
+     ///   tokenizations at special-token boundaries (massive speed-up for shared chat
+     ///   prefixes; default off, zero cost when unset)
+@@ -943,17 +945,18 @@ impl ModelDeploymentCard {
+     ///   per-turn tokenization cost flat instead of growing with history. Set to `0` to
+     ///   fall back to the original hit-without-insert behavior.
+     pub fn tokenizer(&self) -> anyhow::Result<crate::tokenizers::Tokenizer> {
+-        let use_fast = match std::env::var("DYN_TOKENIZER") {
+-            Ok(v) if v == "fastokens" => true,
+-            Ok(v) if v == "default" || v.is_empty() => false,
++        let (use_fast, use_graphtok) = match std::env::var("DYN_TOKENIZER") {
++            Ok(v) if v == "fastokens" => (true, false),
++            Ok(v) if v == "graphtok" => (false, true),
++            Ok(v) if v == "default" || v.is_empty() => (false, false),
+             Ok(v) => {
+                 tracing::warn!(
+                     value = %v,
+-                    "Unrecognized DYN_TOKENIZER value, expected 'fastokens' or 'default'; falling back to default"
++                    "Unrecognized DYN_TOKENIZER value, expected 'fastokens', 'graphtok' or 'default'; falling back to default"
+                 );
+-                false
++                (false, false)
+             }
+-            Err(_) => false,
++            Err(_) => (false, false),
+         };
+ 
+         let cache_enabled = matches!(
+@@ -1012,7 +1015,22 @@ impl ModelDeploymentCard {
+                     |hf: HfTokenizer| crate::tokenizers::HuggingFaceTokenizer::from_tokenizer(hf);
+ 
+                 // Pick the inner backend.
+-                let raw: Arc<dyn crate::tokenizers::traits::Tokenizer> = if use_fast {
++                let raw: Arc<dyn crate::tokenizers::traits::Tokenizer> = if use_graphtok {
++                    match p
++                        .to_str()
++                        .ok_or_else(|| anyhow::anyhow!("non-UTF-8 tokenizer path"))
++                        .and_then(crate::tokenizers::GraphTokTokenizer::from_file)
++                    {
++                        Ok(gpu) => {
++                            tracing::info!("Using native C-ABI tokenizer backend (DYN_TOKENIZER=graphtok)");
++                            Arc::new(gpu)
++                        }
++                        Err(e) => {
++                            tracing::warn!(%e, "Failed to load GraphTok, falling back to HuggingFace");
++                            Arc::new(wrap_hf(hf))
++                        }
++                    }
++                } else if use_fast {
+                     if let Some(path_str) = p.to_str() {
+                         match crate::tokenizers::FastTokenizer::from_file(path_str) {
+                             Ok(fast) => {
+diff --git a/lib/tokenizers/Cargo.toml b/lib/tokenizers/Cargo.toml
+index 6e74a7b..a336a7c 100644
+--- a/lib/tokenizers/Cargo.toml
++++ b/lib/tokenizers/Cargo.toml
+@@ -24,6 +24,7 @@ tracing = { workspace = true }
+ 
+ aho-corasick = "1"
+ base64 = { version = "0.22" }
++libloading = "0.8"
+ rayon = "1"
+ rustc-hash = "1.1"
+ tiktoken-rs = { version = "0.9", default-features = false }
+diff --git a/lib/tokenizers/src/lib.rs b/lib/tokenizers/src/lib.rs
+index c52eb04..644b384 100644
+--- a/lib/tokenizers/src/lib.rs
++++ b/lib/tokenizers/src/lib.rs
+@@ -3,6 +3,7 @@
+ 
+ pub mod cache;
+ pub mod fastokens;
++pub mod graphtok;
+ pub mod hf;
+ pub mod tiktoken;
+ 
+@@ -19,6 +20,7 @@ pub use anyhow::{Error, Result};
+ 
+ pub use cache::{CachedTokenizer, L1CacheStats};
+ pub use fastokens::FastTokenizer;
++pub use graphtok::GraphTokTokenizer;
+ pub use hf::HuggingFaceTokenizer;
+ pub use tiktoken::TikTokenTokenizer;
+ pub use traits::DecodeResult;
+diff --git a/lib/tokenizers/src/graphtok.rs b/lib/tokenizers/src/graphtok.rs
+new file mode 100644
+index 0000000..581c613
+--- /dev/null
++++ b/lib/tokenizers/src/graphtok.rs
+@@ -0,0 +1,274 @@
++// SPDX-License-Identifier: Apache-2.0
++
++//! GraphTok backend: GPU BPE encoding via `libgtok.so`, the C ABI of the
++//! GraphTok (cuTokenize) GPU tokenizer. Any library exposing the same three
++//! functions (`gtok_create`, `gtok_encode`, `gtok_destroy`) can be loaded in
++//! its place through `DYN_GRAPHTOK_LIB`.
++//!
++//! Like [`crate::FastTokenizer`], this is a hybrid: GraphTok encodes, and
++//! HuggingFace decodes. Both are loaded from the same `tokenizer.json`.
++//!
++//! The library is loaded at runtime with `dlopen`, so Dynamo neither links
++//! against CUDA nor requires a GPU unless this backend is selected. A GraphTok
++//! context is single-threaded, so the backend keeps a small pool of contexts
++//! on one GPU and hands one to each concurrent `encode` call; frontend worker
++//! threads beyond the pool size wait for a free context.
++//!
++//! Environment:
++//! - `DYN_GRAPHTOK_LIB`       path to `libgtok.so` (default: `libgtok.so` on the loader path)
++//! - `DYN_GRAPHTOK_CONTEXTS`  contexts in the pool (default 4)
++//! - `DYN_GRAPHTOK_MAX_BYTES` largest input a context is sized for (default 2 MiB);
++//!   larger inputs are encoded by the HuggingFace tokenizer instead
++//! - `DYN_GRAPHTOK_DISPATCH=1` use the library's load-adaptive dispatcher
++//!   (`gtok_dispatcher_create` / `gtok_dispatch_encode`) instead of the context
++//!   pool: one thread-safe object that combines concurrent requests into GPU
++//!   batches and runs small ones on `DYN_GRAPHTOK_DISPATCH_CPU_WORKERS` CPU
++//!   engines (default 1) when one is free
++//!
++//! Correctness: construction encodes a probe containing chat-template special
++//! tokens with both GraphTok and HuggingFace and refuses to load if the token
++//! ids differ. Any per-call GraphTok error also falls back to HuggingFace, so
++//! a request never fails because of this backend.
++
++use std::ffi::{CString, c_char, c_void};
++use std::sync::{Condvar, Mutex};
++
++use libloading::Library;
++
++use super::{
++    Encoding, Error, Result, TokenIdType,
++    hf::HuggingFaceTokenizer,
++    traits::{DecodeResult, Decoder, Encoder, Tokenizer},
++};
++
++type CreateFn = unsafe extern "C" fn(*const c_char, u32) -> *mut c_void;
++type EncodeFn = unsafe extern "C" fn(*mut c_void, *const u8, u32, *mut u32, u32) -> i32;
++type DestroyFn = unsafe extern "C" fn(*mut c_void);
++type DispatcherCreateFn = unsafe extern "C" fn(*const c_char, u32, u32, u32, u32) -> *mut c_void;
++
++const DEFAULT_CONTEXTS: usize = 4;
++const DEFAULT_MAX_BYTES: u32 = 2 << 20;
++
++/// Probe for the construction-time equivalence check: plain text, digits,
++/// whitespace runs and the Qwen/ChatML special tokens a chat request carries.
++const PROBE: &str = "<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n\
++                     <|im_start|>user\nGraphTok probe 12345,  tabs\tand   spaces.\n\
++                     def f(x): return x ** 2  # code<|im_end|>\n<|im_start|>assistant\n";
++
++/// One GraphTok context. Used by one thread at a time.
++struct Ctx {
++    handle: *mut c_void,
++}
++
++// SAFETY: a context is only ever used by the thread that took it from the pool.
++unsafe impl Send for Ctx {}
++
++/// The library's dispatcher: one object, safe to call from every thread.
++struct Dispatch {
++    handle: *mut c_void,
++    encode_fn: EncodeFn,
++    destroy_fn: DestroyFn,
++}
++
++// SAFETY: gtok_dispatch_encode is documented thread-safe; the handle is only
++// destroyed in Drop, after every call has returned.
++unsafe impl Send for Dispatch {}
++unsafe impl Sync for Dispatch {}
++
++pub struct GraphTokTokenizer {
++    // Declared before `_lib` so contexts are destroyed while the library is loaded.
++    dispatch: Option<Dispatch>,
++    pool: Mutex<Vec<Ctx>>,
++    available: Condvar,
++    encode_fn: EncodeFn,
++    destroy_fn: DestroyFn,
++    max_bytes: u32,
++    hf_decoder: HuggingFaceTokenizer,
++    _lib: Library,
++}
++
++impl GraphTokTokenizer {
++    pub fn from_file(path: &str) -> Result<Self> {
++        let lib_path = std::env::var("DYN_GRAPHTOK_LIB").unwrap_or_else(|_| "libgtok.so".into());
++        let contexts = std::env::var("DYN_GRAPHTOK_CONTEXTS")
++            .ok()
++            .and_then(|s| s.parse::<usize>().ok())
++            .filter(|&n| n > 0)
++            .unwrap_or(DEFAULT_CONTEXTS);
++        let max_bytes = std::env::var("DYN_GRAPHTOK_MAX_BYTES")
++            .ok()
++            .and_then(|s| s.parse::<u32>().ok())
++            .unwrap_or(DEFAULT_MAX_BYTES);
++
++        // SAFETY: loading a library runs its initialisers; libgtok's are CUDA runtime setup.
++        let lib = unsafe { Library::new(&lib_path) }
++            .map_err(|e| Error::msg(format!("Error loading {lib_path}: {e}")))?;
++        let (create_fn, encode_fn, destroy_fn) = unsafe {
++            let sym = |name: &[u8]| {
++                Error::msg(format!(
++                    "{lib_path} has no symbol {}",
++                    String::from_utf8_lossy(&name[..name.len() - 1])
++                ))
++            };
++            (
++                *lib.get::<CreateFn>(b"gtok_create\0").map_err(|_| sym(b"gtok_create\0"))?,
++                *lib.get::<EncodeFn>(b"gtok_encode\0").map_err(|_| sym(b"gtok_encode\0"))?,
++                *lib.get::<DestroyFn>(b"gtok_destroy\0").map_err(|_| sym(b"gtok_destroy\0"))?,
++            )
++        };
++
++        let c_path = CString::new(path).map_err(|e| Error::msg(format!("Bad tokenizer path: {e}")))?;
++        let dispatch = if std::env::var("DYN_GRAPHTOK_DISPATCH").is_ok_and(|v| v == "1") {
++            let cpu_workers = std::env::var("DYN_GRAPHTOK_DISPATCH_CPU_WORKERS")
++                .ok()
++                .and_then(|s| s.parse::<u32>().ok())
++                .unwrap_or(1);
++            let (dcreate, dencode, ddestroy) = unsafe {
++                let missing = |n: &str| Error::msg(format!("{lib_path} has no symbol {n}"));
++                (
++                    *lib.get::<DispatcherCreateFn>(b"gtok_dispatcher_create\0")
++                        .map_err(|_| missing("gtok_dispatcher_create"))?,
++                    *lib.get::<EncodeFn>(b"gtok_dispatch_encode\0")
++                        .map_err(|_| missing("gtok_dispatch_encode"))?,
++                    *lib.get::<DestroyFn>(b"gtok_dispatcher_destroy\0")
++                        .map_err(|_| missing("gtok_dispatcher_destroy"))?,
++                )
++            };
++            // policy 0 = adaptive; batch caps 8 MiB / 256 documents.
++            let handle = unsafe { dcreate(c_path.as_ptr(), cpu_workers, 8 << 20, 256, 0) };
++            if handle.is_null() {
++                return Err(Error::msg(format!("gtok_dispatcher_create failed for {path}")));
++            }
++            tracing::info!(cpu_workers, "GraphTok dispatcher enabled");
++            Some(Dispatch { handle, encode_fn: dencode, destroy_fn: ddestroy })
++        } else {
++            None
++        };
++        let contexts = if dispatch.is_some() { 0 } else { contexts };
++        let mut pool: Vec<Ctx> = Vec::with_capacity(contexts);
++        for _ in 0..contexts {
++            let handle = unsafe { create_fn(c_path.as_ptr(), max_bytes) };
++            if handle.is_null() {
++                for c in pool.drain(..) {
++                    unsafe { destroy_fn(c.handle) };
++                }
++                return Err(Error::msg(format!("gtok_create failed for {path}")));
++            }
++            // At most one token per input byte; slack covers the empty-input case.
++            pool.push(Ctx { handle });
++        }
++
++        let tokenizer = Self {
++            dispatch,
++            pool: Mutex::new(pool),
++            available: Condvar::new(),
++            encode_fn,
++            destroy_fn,
++            max_bytes,
++            hf_decoder: HuggingFaceTokenizer::from_file(path)?,
++            _lib: lib,
++        };
++
++        let want = tokenizer.hf_decoder.encode(PROBE)?;
++        let got = tokenizer.gpu_encode(PROBE)?;
++        if got.as_slice() != want.token_ids() {
++            return Err(Error::msg(format!(
++                "GraphTok token ids differ from HuggingFace for {path}; refusing to load"
++            )));
++        }
++        // Name the library: the backend loads any library exposing this C ABI,
++        // and a benchmark must be able to prove which one served a run.
++        tracing::info!(contexts, max_bytes, lib = %lib_path, "native tokenizer library loaded");
++        Ok(tokenizer)
++    }
++
++    fn take(&self) -> Ctx {
++        let mut pool = self.pool.lock().unwrap_or_else(|e| e.into_inner());
++        loop {
++            if let Some(c) = pool.pop() {
++                return c;
++            }
++            pool = self.available.wait(pool).unwrap_or_else(|e| e.into_inner());
++        }
++    }
++
++    fn give_back(&self, c: Ctx) {
++        self.pool.lock().unwrap_or_else(|e| e.into_inner()).push(c);
++        self.available.notify_one();
++    }
++
++    fn gpu_encode(&self, input: &str) -> Result<Vec<TokenIdType>> {
++        // The library writes the ids straight into the Vec the Encoding will
++        // own: no staging buffer and no copy. A byte-level BPE emits at most
++        // one token per input byte; NFC can lengthen the input slightly, hence
++        // the margin, and the library reports -2 rather than overrun `cap`.
++        let cap = input.len() + input.len() / 8 + 16;
++        let mut ids: Vec<TokenIdType> = Vec::with_capacity(cap);
++        if let Some(d) = &self.dispatch {
++            let r = unsafe {
++                (d.encode_fn)(d.handle, input.as_ptr(), input.len() as u32, ids.as_mut_ptr(), cap as u32)
++            };
++            if r < 0 {
++                return Err(Error::msg(format!("gtok_dispatch_encode error {r}")));
++            }
++            // SAFETY: the library initialised exactly r <= cap elements.
++            unsafe { ids.set_len(r as usize) };
++            return Ok(ids);
++        }
++        let c = self.take();
++        let r = unsafe {
++            (self.encode_fn)(c.handle, input.as_ptr(), input.len() as u32, ids.as_mut_ptr(), cap as u32)
++        };
++        self.give_back(c);
++        if r < 0 {
++            return Err(Error::msg(format!("gtok_encode error {r}")));
++        }
++        // SAFETY: the library initialised exactly r <= cap elements.
++        unsafe { ids.set_len(r as usize) };
++        Ok(ids)
++    }
++}
++
++impl Drop for GraphTokTokenizer {
++    fn drop(&mut self) {
++        if let Some(d) = self.dispatch.take() {
++            unsafe { (d.destroy_fn)(d.handle) };
++        }
++        let pool = self.pool.get_mut().unwrap_or_else(|e| e.into_inner());
++        for c in pool.drain(..) {
++            unsafe { (self.destroy_fn)(c.handle) };
++        }
++    }
++}
++
++impl Encoder for GraphTokTokenizer {
++    fn encode(&self, input: &str) -> Result<Encoding> {
++        if input.len() <= self.max_bytes as usize {
++            match self.gpu_encode(input) {
++                Ok(ids) => return Ok(Encoding::Sp(ids)),
++                Err(e) => tracing::warn!(%e, "GraphTok encode failed; using HuggingFace"),
++            }
++        } else {
++            // Never silent: an oversize input is encoded by HuggingFace, and a
++            // benchmark must be able to see that it did not measure GraphTok.
++            tracing::warn!(
++                bytes = input.len(),
++                max_bytes = self.max_bytes,
++                "GraphTok input exceeds DYN_GRAPHTOK_MAX_BYTES; using HuggingFace"
++            );
++        }
++        self.hf_decoder.encode(input)
++    }
++
++    fn encode_batch(&self, inputs: &[&str]) -> Result<Vec<Encoding>> {
++        inputs.iter().map(|s| self.encode(s)).collect()
++    }
++}
++
++impl Decoder for GraphTokTokenizer {
++    fn decode(&self, token_ids: &[TokenIdType], skip_special_tokens: bool) -> Result<DecodeResult> {
++        self.hf_decoder.decode(token_ids, skip_special_tokens)
++    }
++}
++
++impl Tokenizer for GraphTokTokenizer {}
+diff --git a/lib/tokenizers/tests/graphtok_dispatch.rs b/lib/tokenizers/tests/graphtok_dispatch.rs
+new file mode 100644
+index 0000000..a8ac06f
+--- /dev/null
++++ b/lib/tokenizers/tests/graphtok_dispatch.rs
+@@ -0,0 +1,38 @@
++// SPDX-License-Identifier: Apache-2.0
++
++//! GraphTok backend in dispatcher mode (DYN_GRAPHTOK_DISPATCH=1): token ids
++//! from many threads at once must equal HuggingFace's. Runs only when
++//! GTOK_TEST_LIB (a built libgtok.so) and GTOK_TEST_VOCAB (a tokenizer.json
++//! it supports) are set; needs a GPU.
++
++use dynamo_tokenizers::{GraphTokTokenizer, HuggingFaceTokenizer, traits::Encoder};
++
++#[test]
++fn dispatcher_mode_matches_huggingface_under_concurrency() {
++    let (Ok(lib), Ok(vocab)) = (std::env::var("GTOK_TEST_LIB"), std::env::var("GTOK_TEST_VOCAB")) else {
++        eprintln!("skipped: set GTOK_TEST_LIB and GTOK_TEST_VOCAB");
++        return;
++    };
++    // SAFETY: set before any other thread exists in this test binary's test.
++    unsafe {
++        std::env::set_var("DYN_GRAPHTOK_LIB", &lib);
++        std::env::set_var("DYN_GRAPHTOK_DISPATCH", "1");
++        std::env::set_var("DYN_GRAPHTOK_DISPATCH_CPU_WORKERS", "2");
++    }
++    let gt = GraphTokTokenizer::from_file(&vocab).expect("load GraphTok in dispatcher mode");
++    let hf = HuggingFaceTokenizer::from_file(&vocab).expect("load HF");
++    let base = "The quick brown fox, 12345 times.\n\tdef f(x): return x ** 2  # caf\u{e9} \u{65e5}\u{672c}\u{8a9e} ";
++    let inputs: Vec<String> = (0..96).map(|i| base.repeat(1 + (i * 37) % 400)).collect();
++    std::thread::scope(|s| {
++        for chunk in inputs.chunks(6) {
++            let (gt, hf) = (&gt, &hf);
++            s.spawn(move || {
++                for text in chunk {
++                    let got = gt.encode(text).unwrap();
++                    let want = hf.encode(text).unwrap();
++                    assert_eq!(got.token_ids(), want.token_ids(), "{} bytes", text.len());
++                }
++            });
++        }
++    });
++}

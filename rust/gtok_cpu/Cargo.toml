@@ -1,0 +1,24 @@
+[package]
+name = "gtok-cpu"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+
+# GraphTok's CPU engine: rs-gigatoken (MIT, Marcel Rød) behind a small C ABI
+# with gtokcpu_* symbols, statically linked into libgtok and the Python
+# extension. Only the single-threaded per-handle encode is used -- no rayon
+# pool -- so the library stays fork-safe inside vLLM and Dynamo.
+[lib]
+name = "gtok_cpu"
+crate-type = ["staticlib"]
+
+[dependencies]
+rs-gigatoken = { path = "../../third_party/rs-gigatoken" }
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+debug = false
+panic = "unwind"
