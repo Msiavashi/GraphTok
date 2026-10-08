@@ -9,6 +9,8 @@
 [![C++17](https://img.shields.io/badge/C%2B%2B-17-00599C.svg?logo=cplusplus&logoColor=white)](CMakeLists.txt)
 [![Integrations: vLLM | Dynamo](https://img.shields.io/badge/integrations-vLLM%20%7C%20NVIDIA%20Dynamo-orange.svg)](#integrations)
 
+**Website and docs:** https://msiavashi.github.io/GraphTok/
+
 GraphTok is a BPE tokenizer that runs end to end on an NVIDIA GPU. Pre-tokenization, BPE merging and output assembly are captured as one replayable CUDA graph, and token IDs are bit-identical to the reference tokenizers (`tiktoken` for GPT-2, Hugging Face `tokenizers` for the rest). Small inputs can be routed to a CPU engine, and a load-adaptive dispatcher batches concurrent requests into single graph replays. Repository: https://github.com/Msiavashi/GraphTok.
 
 - **Exact:** token IDs match the reference tokenizer bit for bit.
