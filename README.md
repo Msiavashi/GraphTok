@@ -11,6 +11,10 @@
 
 GraphTok is a BPE tokenizer that runs end to end on an NVIDIA GPU. Pre-tokenization, BPE merging and output assembly are captured as one replayable CUDA graph, and token IDs are bit-identical to the reference tokenizers (`tiktoken` for GPT-2, Hugging Face `tokenizers` for the rest). Small inputs can be routed to a CPU engine, and a load-adaptive dispatcher batches concurrent requests into single graph replays. Repository: https://github.com/Msiavashi/GraphTok.
 
+- **Exact:** token IDs match the reference tokenizer bit for bit.
+- **Built for long contexts:** encodes 100k to 1M-token prompts in one graph replay.
+- **Drop-in for serving:** a Python module, a C library, a vLLM plugin and an NVIDIA Dynamo backend.
+
 Names: Python module `gpu_bpe_tokenizer`, C library `libgtok`, CLI `gpu_bpe_tokenize`.
 
 ## News
@@ -35,7 +39,7 @@ The `all` preset (and `pip install .`) builds GPT-2, Llama 3, DeepSeek-V3 and Ge
 Requirements: Linux, an NVIDIA GPU, CUDA toolkit 12.6 or newer (tested with 12.6, 12.8 and 13.1), CMake >= 3.24, a C++17 compiler, Python >= 3.10 (`utf8proc` when Qwen is enabled).
 
 ```bash
-git clone https://github.com/Msiavashi/GraphTok.git && cd graphtok
+git clone https://github.com/Msiavashi/GraphTok.git && cd GraphTok
 
 # Python module
 pip install .                                   # or '.[test]' / '.[vllm]'
@@ -107,7 +111,8 @@ The `Makefile` wraps the common workflows; `make help` lists them:
 
 ```bash
 pip install '.[vllm]'
-GBPE_VLLM=1 vllm serve Qwen/Qwen3-32B
+cmake --preset qwen25 && cmake --build build/qwen25 -j --target gtok   # builds libgtok.so
+GBPE_VLLM=1 GBPE_GTOK_LIB=$PWD/build/qwen25/libgtok.so vllm serve Qwen/Qwen3-32B
 ```
 
 | Variable | Meaning |
