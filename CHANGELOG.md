@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.3.0] - 2026-10 - First public release
+## [0.3.0] - 2026-10-09 - First public release
 
 - GPU BPE encoder captured as one CUDA graph per power-of-two input-size
   class: GPU pre-tokenization, warp-cooperative BPE merge with an overflow
