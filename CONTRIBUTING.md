@@ -1,49 +1,57 @@
 # Contributing to GraphTok
 
-Issues and pull requests are welcome at https://github.com/Msiavashi/graphtok.
+Issues and pull requests are welcome at https://github.com/Msiavashi/graphtok. By participating you agree to the [Code of Conduct](CODE_OF_CONDUCT.md).
+
+## Branch model
+
+- `main` is protected and holds releases only.
+- `develop` is the integration branch.
+- Fork the repository, branch from `develop` (`feature/<name>`, `fix/<name>`), and open the pull request against `develop`.
+
+See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for setup, builds and tests.
+
+## Commit messages
+
+- Short imperative subject line (about 72 characters), for example `Fix overflow path for long pre-tokens`.
+- A body that explains why the change is needed when it is not obvious.
+- Reference issues with `Fixes #123` where applicable.
+- One logical change per commit.
+
+## Pull request checklist
+
+- [ ] The affected CMake presets compile (`cmake --preset <preset> && cmake --build build/<preset> -j`).
+- [ ] `pytest tests/` passes on a GPU.
+- [ ] Token IDs stay identical to the reference tokenizers: `scripts/test-all-presets.sh` exits 0.
+- [ ] Kernel changes: `compute-sanitizer --tool=synccheck` reports 0 errors.
+- [ ] Documentation is updated.
+- [ ] `CHANGELOG.md` has an entry.
+
+Changes to the pre-tokenizer, merge kernel, slot layouts or CPU route must keep token IDs identical to `tiktoken` (GPT-2) and Hugging Face `tokenizers`.
 
 ## Reporting bugs
 
-Include the exact CLI invocation or Python call, the input (or a sample), the
-`tokenizer.json` or its source, the build preset and the GPU model. For a
-token-ID mismatch against `tiktoken` or Hugging Face `tokenizers`, include the
-byte offset where the outputs first differ and the surrounding text.
+Open an issue with the bug report template and include:
 
-## Before opening a pull request
+- The exact CLI invocation or Python call.
+- The input, or a small sample that reproduces it.
+- The `tokenizer.json` or its source.
+- The build preset, GPU model, CUDA toolkit and driver versions.
+- For a token-ID mismatch: the reference output, the GraphTok output, and the first differing position with the surrounding text.
 
-1. Exactness gate for the affected presets:
-   ```bash
-   scripts/test-all-presets.sh            # or: scripts/test-all-presets.sh gpt2 qwen25
-   ```
-2. Python tests:
-   ```bash
-   pip install '.[test]'
-   pytest tests/
-   ```
-3. For any kernel change, `compute-sanitizer` must report 0 errors:
-   ```bash
-   compute-sanitizer --tool=synccheck ./build/all/gpu_bpe_tokenize \
-       --vocab data/hf_gpt2_tokenizer.json --input small.txt \
-       --output /tmp/out.bin --runs 1 --warmup 0
-   ```
-
-Changes to the pre-tokenizer, merge kernel, slot layouts or CPU route must keep
-token IDs identical to the reference tokenizer.
-
-## Code style
-
-- C++/CUDA: 4-space indent, `snake_case` functions and variables,
-  `PascalCase` types. Match the surrounding code.
-- Warp-level operations run on all 32 lanes with an explicit
-  `0xFFFFFFFFu` mask (see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)).
-- The captured graph must stay free of allocation and host synchronization.
-- Comments explain why, not what.
+Report security issues privately as described in [SECURITY.md](SECURITY.md).
 
 ## Adding a tokenizer
 
-See [docs/ADDING_A_TOKENIZER.md](docs/ADDING_A_TOKENIZER.md).
+Follow [docs/ADDING_A_TOKENIZER.md](docs/ADDING_A_TOKENIZER.md). A new tokenizer needs a preset, a vocabulary download entry and an exactness check against its reference tokenizer.
+
+## Code style
+
+- C++/CUDA: 4-space indent, `snake_case` functions and variables, `PascalCase` types. Match the surrounding code.
+- Warp-level operations run on all 32 lanes with an explicit `0xFFFFFFFFu` mask (see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)).
+- The captured graph must stay free of allocation and host synchronization.
+- Python: PEP 8, 4-space indent.
+- Comments explain why, not what.
 
 ## License
 
-Contributions are licensed under Apache 2.0, the same as the project. See
-[LICENSE](LICENSE).
+Contributions are licensed under the Apache License 2.0, the same as the project. See [LICENSE](LICENSE). A `Signed-off-by` line (`git commit -s`) is welcome.

@@ -1,6 +1,6 @@
 cff-version: 1.2.0
 message: "If you use this software, please cite it as below."
-title: "cuTokenize"
+title: "GraphTok"
 repository-code: "https://github.com/Msiavashi/graphtok"
 license: Apache-2.0
 authors:

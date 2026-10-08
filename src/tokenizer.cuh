@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2026 the cuTokenize contributors
+// Copyright 2026 the GraphTok contributors
 
 #pragma once
 // gpu-bpe-tokenizer — public host-side API of the encoder.

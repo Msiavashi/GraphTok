@@ -27,7 +27,7 @@ VOCAB_FILE ?= $(VOCAB_FILE_$(VOCAB))
 	python-install sanitize
 
 help: ## Show this help
-	@echo "cuTokenize developer commands"
+	@echo "GraphTok developer commands"
 	@echo
 	@echo "Usage: make <target> [PRESET=all] [VOCAB=gpt2] [DEVICE=0] [ARGS='...']"
 	@echo

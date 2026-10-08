@@ -1,115 +1,105 @@
 # GraphTok
 
-GraphTok is a BPE tokenizer that runs end to end on an NVIDIA GPU. Pre-tokenization, BPE merging and output assembly are captured as one replayable CUDA graph, and token IDs are bit-identical to the reference tokenizers (`tiktoken` for GPT-2, Hugging Face `tokenizers` for the rest). Small inputs can be routed to a CPU engine, and a load-adaptive dispatcher batches concurrent requests into single graph replays.
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-0.3.0-green.svg)](CHANGELOG.md)
+[![CUDA 12.x](https://img.shields.io/badge/CUDA-12.x-76B900.svg)](docs/BUILD.md)
+[![Python >=3.10](https://img.shields.io/badge/python-%3E%3D3.10-blue.svg)](pyproject.toml)
 
-Names: the Python module is `gpu_bpe_tokenizer`, the C library is `libgtok` (CMake target `gtok`), and the CLI binary is `gpu_bpe_tokenize`. Repository: https://github.com/Msiavashi/graphtok.
+GraphTok is a BPE tokenizer that runs end to end on an NVIDIA GPU. Pre-tokenization, BPE merging and output assembly are captured as one replayable CUDA graph, and token IDs are bit-identical to the reference tokenizers (`tiktoken` for GPT-2, Hugging Face `tokenizers` for the rest). Small inputs can be routed to a CPU engine, and a load-adaptive dispatcher batches concurrent requests into single graph replays. Repository: https://github.com/Msiavashi/graphtok.
+
+Names: Python module `gpu_bpe_tokenizer`, C library `libgtok`, CLI `gpu_bpe_tokenize`.
+
+## News
+
+- **2026-10** — v0.3.0, the first public release: GPU tokenizer, Python bindings, `libgtok` C ABI, vLLM plugin and NVIDIA Dynamo backend patch.
+- **2026-10** — Paper "Taking Tokenization off the Host for Agentic LLM Serving" on arXiv (arXiv link coming soon).
 
 ## Supported tokenizers
 
-| Tokenizer | CMake preset | `GBPE_VOCABS` value |
+| Tokenizer | CMake preset | Vocab file |
 |---|---|---|
-| GPT-2 | `gpt2` | `GPT2` |
-| Llama 3 | `llama3` | `LLAMA3` |
-| Qwen 2.5 / Qwen 3 (same tokenizer) | `qwen25` | `QWEN25` |
-| DeepSeek-V3 | `deepseek_v3` | `DEEPSEEK_V3` |
-| Gemma 3 | `gemma3` | `GEMMA3` |
+| GPT-2 | `gpt2` | `data/hf_gpt2_tokenizer.json` |
+| Llama 3 | `llama3` | `data/llama3_tokenizer.json` |
+| Qwen 2.5 / Qwen 3 | `qwen25` | `data/vocabs/qwen25.json` |
+| DeepSeek-V3 | `deepseek_v3` | `data/vocabs/deepseek_v3.json` |
+| Gemma 3 | `gemma3` | `data/vocabs/gemma3.json` |
 
-The `all` preset (and `pip install .`) builds GPT-2, Llama 3, DeepSeek-V3 and Gemma 3. Qwen is built with the `qwen25` preset or an explicit `GBPE_VOCABS` list that contains `QWEN25`. The `bytelevel` preset builds GPT-2, Llama 3, Qwen 2.5 and DeepSeek-V3.
+The `all` preset (and `pip install .`) builds GPT-2, Llama 3, DeepSeek-V3 and Gemma 3. Build Qwen with the `qwen25` preset. See [docs/BUILD.md](docs/BUILD.md) for every preset and option.
 
-## Requirements
+## Quick start
 
-- Linux, NVIDIA GPU, CUDA toolkit 12.x (developed with 12.6).
-- Default CUDA architectures: `80;90` (A100, H100). Override with `CMAKE_CUDA_ARCHITECTURES`.
-- CMake >= 3.24, a C++17 compiler (developed with gcc 11).
-- Python >= 3.10, `scikit-build-core` and `pybind11` for the Python module.
-- `utf8proc` (headers and library) when Qwen is enabled.
-- Optional: a nightly Rust `cargo` to link the gigatoken CPU engine (`-DGBPE_GIGATOKEN=AUTO|ON|OFF`, default `AUTO`). Without it, the CPU route uses the built-in host encoder.
-
-## Install
-
-Python module:
+Requirements: Linux, an NVIDIA GPU, CUDA toolkit 12.x, CMake >= 3.24, a C++17 compiler, Python >= 3.10 (`utf8proc` when Qwen is enabled).
 
 ```bash
-pip install .                 # or: pip install '.[test]' / '.[vllm]'
-```
+git clone https://github.com/Msiavashi/graphtok.git && cd graphtok
 
-CMake presets (binaries land in `build/<preset>/`):
+# Python module
+pip install .                                   # or '.[test]' / '.[vllm]'
 
-```bash
+# CLI and libgtok
 cmake --preset all && cmake --build build/all -j
-cmake --preset qwen25 && cmake --build build/qwen25 -j
+
+# Vocabulary files (Llama 3 and Gemma 3 need a token with accepted licenses)
+HF_TOKEN=hf_... python3 scripts/download-vocabs.py
 ```
 
-Other architectures:
-
-```bash
-cmake --preset all -DCMAKE_CUDA_ARCHITECTURES=89
-CMAKE_ARGS="-DCMAKE_CUDA_ARCHITECTURES=89" pip install .
-```
-
-See [docs/BUILD.md](docs/BUILD.md) for all build options. A `Makefile` wraps the common workflows (`make help`).
-
-## Vocabulary files
-
-```bash
-HF_TOKEN=hf_... python3 scripts/download-vocabs.py      # --force re-downloads
-```
-
-This writes `data/hf_gpt2_tokenizer.json`, `data/llama3_tokenizer.json` and `data/vocabs/{qwen25,deepseek_v3,gemma3}.json`. Llama 3 and Gemma 3 are gated on Hugging Face: the token must belong to an account that has accepted their licenses. The token is read from `HF_TOKEN` or from `$HF_HOME/token`.
-
-## Quickstart
-
-### CLI
+Encode a file with the CLI:
 
 ```bash
 ./build/all/gpu_bpe_tokenize --vocab data/hf_gpt2_tokenizer.json \
     --input prompt.txt --output tokens.bin
-
-# several documents in one graph replay
-./build/all/gpu_bpe_tokenize --vocab data/hf_gpt2_tokenizer.json \
-    --inputs a.txt,b.txt --output tokens.bin
-
-# chat template with BOS
-./build/all/gpu_bpe_tokenize --vocab data/llama3_tokenizer.json \
-    --chat chat.json --add-bos --output tokens.bin
 ```
 
-Other flags: `--runs N`, `--warmup N`, `--csv`, `--no-cuda-graph`, `--add-eos`, `--no-generation-prompt`, `--decode`, `--help`.
-
-### Python
+Encode in Python:
 
 ```python
 import gpu_bpe_tokenizer as gbpe
 
 tok = gbpe.Tokenizer("data/hf_gpt2_tokenizer.json")
 ids = tok.encode("Hello, world!")             # list[int]
-arr = tok.encode_numpy("Hello, world!")       # np.ndarray[uint32]
 text = tok.decode(ids)
 
 tokens, offsets = tok.encode_batch(["first doc", "second doc"])
-doc0 = tokens[offsets[0]:offsets[1]]          # byte-level vocabs only
+doc0 = tokens[offsets[0]:offsets[1]]
 
 # thread-safe, load-adaptive encoder for many concurrent callers
 d = gbpe.Dispatcher("data/hf_gpt2_tokenizer.json", cpu_workers=2)
 arr = d.encode_numpy("Hello, world!")
 ```
 
-`Tokenizer(vocab_path, max_input_chars=4096, enable_decode=True, host_max_bytes=None, cpu_backend="")`. `cpu_backend` is `auto`, `gigatoken`, `host` or `off`; an empty string reads `GTOK_CPU_BACKEND`. Also exported: `encode_to_device`, `encode_batch_to_device` (return torch CUDA tensors), `decode_bytes`. `Dispatcher(vocab_path, cpu_workers=1, max_batch_bytes=8 MiB, max_batch_docs=256, policy="adaptive"|"gpu"|"cpu", cpu_backend="")` also provides `stats()`.
+## Useful commands
 
-### C ABI (libgtok)
+| Task | Command |
+|---|---|
+| Configure and build a preset | `cmake --preset <preset> && cmake --build build/<preset> -j` |
+| Build for another GPU arch | `cmake --preset all -DCMAKE_CUDA_ARCHITECTURES=89` |
+| Build only `libgtok` | `cmake --build build/all -j --target gtok` |
+| Install the Python module | `pip install .` (tests: `pip install '.[test]'`) |
+| Download vocabularies | `python3 scripts/download-vocabs.py` (`--force` re-downloads) |
+| Encode a file | `./build/all/gpu_bpe_tokenize --vocab <json> --input <txt> --output <bin>` |
+| Encode several files in one replay | `... --inputs a.txt,b.txt --output tokens.bin` |
+| Chat template with BOS | `... --vocab data/llama3_tokenizer.json --chat chat.json --add-bos --output tokens.bin` |
+| Decode IDs back to text | `... --decode --input tokens.bin --output text.txt` |
+| CLI help | `./build/all/gpu_bpe_tokenize --help` |
+| Python tests | `pytest tests/` |
+| Exactness gate (all / selected presets) | `scripts/test-all-presets.sh` / `scripts/test-all-presets.sh gpt2 qwen25` |
+| CUDA synccheck | `compute-sanitizer --tool=synccheck ./build/all/gpu_bpe_tokenize --vocab data/hf_gpt2_tokenizer.json --input small.txt --output /tmp/out.bin --runs 1 --warmup 0` |
 
-`libgtok.so` exports only `gtok_*` symbols (`src/gtok.map`); the functions are defined in `src/gtok_shim.cc`:
+The `Makefile` wraps the common workflows; `make help` lists them:
 
-- `gtok_create`, `gtok_destroy`, `gtok_vocab_size`
-- `gtok_encode`, `gtok_encode_to_device`, `gtok_encode_batch`
-- `gtok_cpu_max_bytes`, `gtok_set_cpu_max_bytes`, `gtok_cpu_backend`
-- `gtok_dispatcher_create`, `gtok_dispatch_encode`, `gtok_dispatcher_stats`, `gtok_dispatcher_destroy`
+| Target | Does |
+|---|---|
+| `make build PRESET=llama3` | configure and build a preset |
+| `make run INPUT=prompt.txt OUTPUT=/tmp/tokens.bin VOCAB=llama3` | tokenize a file |
+| `make test PRESET=llama3` / `make test-all` | exactness gate for one / all presets |
+| `make python-install` / `make test-python` | install the module / run the Python tests |
+| `make test-exactness` | full native + Python exactness gate |
+| `make sanitize INPUT=small.txt` | CUDA synccheck |
+| `make clean` | clean the selected preset |
 
-Build it with `cmake --build build/all -j --target gtok`.
+## Integrations
 
-## Serving integrations
-
-**vLLM.** The package registers a `vllm.general_plugins` entry point. It wraps vLLM's tokenizer so that `encode` / `__call__` on strings run through `libgtok.so`; everything else stays on the Hugging Face tokenizer.
+**vLLM.** The package registers a `vllm.general_plugins` entry point that routes string `encode` / `__call__` through `libgtok.so`.
 
 ```bash
 pip install '.[vllm]'
@@ -125,44 +115,17 @@ GBPE_VLLM=1 vllm serve Qwen/Qwen3-32B
 
 **NVIDIA Dynamo.** See [integrations/dynamo/README.md](integrations/dynamo/README.md).
 
-## Testing
+## Development
 
-```bash
-pip install '.[test]'
-pytest tests/                               # needs a GPU and the vocab files
-scripts/test-all-presets.sh                 # builds presets, runs exactness gates
-scripts/test-all-presets.sh gpt2 qwen25     # selected presets
-compute-sanitizer --tool=synccheck ./build/all/gpu_bpe_tokenize \
-    --vocab data/hf_gpt2_tokenizer.json --input small.txt \
-    --output /tmp/out.bin --runs 1 --warmup 0
-```
+Development happens on the `develop` branch and pull requests target `develop`; `main` holds releases. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for the environment, tests and release process, and [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.
 
-`scripts/test-all-presets.sh` uses `GBPE_EXACTNESS_DEVICE` (default `2`) to choose the GPU. C++ gate executables (`test_encode_batch_smoke`, `test_cpu_route_classifier`, `test_boundary_simd_equiv`) are built into `build/<preset>/` when `GBPE_BUILD_TESTS=ON` (default).
+## Documentation
 
-## Project layout
-
-```
-src/                 C++/CUDA sources
-  tokenizer.{cu,cuh}   GPU pre-tokenizer, BPE merge, assembly, graph capture
-  vocab.{h,cc}         tokenizer.json loader and merge-table builder
-  pretokenize.*, pretok_boundary*.h   host pre-tokenizer and boundary rules
-  host_encode.*        host BPE encoder
-  cpu_route.*, cpu_thresholds.h       CPU route (gigatoken / host encoder)
-  dispatcher.*         load-adaptive dispatcher
-  special_tokens.*     BOS/EOS and chat template
-  main.cc              CLI
-  python_bindings.cc   pybind11 module
-  gtok_shim.cc, gtok.map              libgtok C ABI
-python/gpu_bpe_tokenizer/   Python package and vLLM plugin
-rust/gtok_cpu/       Rust wrapper that links gigatoken
-third_party/         nlohmann/json, gigatoken source
-generated/           generated character-class table
-integrations/dynamo/ Dynamo patch
-scripts/             vocab download, preset test runner
-tools/               exactness collector and helpers
-tests/               Python and C++ tests
-docs/                architecture, build, adding a tokenizer
-```
+- [docs/BUILD.md](docs/BUILD.md) — build presets and options
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — design of the GPU pipeline
+- [docs/ADDING_A_TOKENIZER.md](docs/ADDING_A_TOKENIZER.md) — adding a vocabulary
+- [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) — development workflow
+- [CHANGELOG.md](CHANGELOG.md) — release history
 
 ## Citation
 

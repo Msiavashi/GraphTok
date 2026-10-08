@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2026 the cuTokenize contributors
+// Copyright 2026 the GraphTok contributors
 //
 // CPU route for inputs too small to amortize a graph replay (~70-120 us of
 // fixed GPU latency). Shared by the Python bindings and the C ABI so both pick

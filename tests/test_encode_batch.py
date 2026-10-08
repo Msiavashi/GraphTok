@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2026 the cuTokenize contributors
+# Copyright 2026 the GraphTok contributors
 """Bit-exactness tests for the batched encode path (`encode_batch`).
 
 The contract under test: `encode_batch(docs)` must return exactly what you get

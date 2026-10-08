@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2026 the cuTokenize contributors
+// Copyright 2026 the GraphTok contributors
 //
 // Load-adaptive dispatch for a serving frontend that tokenizes many
 // independent requests from many threads at once.

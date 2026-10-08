@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2026 the cuTokenize contributors
+// Copyright 2026 the GraphTok contributors
 #include "cpu_route.h"
 #include "cpu_thresholds.h"
 

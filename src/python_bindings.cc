@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2026 the cuTokenize contributors
+// Copyright 2026 the GraphTok contributors
 //
 // Python bindings for gpu_bpe_tokenizer. The Tokenizer class is a thin
 // wrapper around HostVocab + VocabPack + TokenizerCtx that

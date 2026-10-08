@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2026 the cuTokenize contributors
+# Copyright 2026 the GraphTok contributors
 """gpu_bpe_tokenizer — GPU-accelerated BPE tokenizer.
 
 Thin Python wrapper around the C++/CUDA encoder. Bit-exact with the CLI

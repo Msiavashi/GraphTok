@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2026 the cuTokenize contributors
+# Copyright 2026 the GraphTok contributors
 """vLLM adapter: route vLLM's prompt tokenization through GraphTok (libgtok.so).
 
 The tokenizer vLLM builds (``cached_tokenizer_from_config`` and the one handed

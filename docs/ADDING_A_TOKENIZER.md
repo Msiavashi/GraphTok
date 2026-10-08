@@ -9,7 +9,7 @@ Llama-3, Qwen-2.5, or DeepSeek-V3 (most byte-level BPE models do), there is
 **no boundary-kernel change**. Its AddedVocabulary entries also work without
 new code when they are literal, have no `single_word`/strip flags, use an
 identity normalizer (or the existing ASCII-stable NFC case), and no literal
-start byte occurs inside another literal. Unsupported semantics fail during
+start byte occurs inside another literal. Other semantics are rejected during
 vocabulary loading; add a shared matcher capability rather than embedding it
 in the family regex kernel.
 

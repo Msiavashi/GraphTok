@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2026 the cuTokenize contributors
+// Copyright 2026 the GraphTok contributors
 //
 // Does the AVX2 boundary fast path agree with the scalar one, lane for lane?
 // Random class/byte arrays drawn from an alphabet that exercises every branch

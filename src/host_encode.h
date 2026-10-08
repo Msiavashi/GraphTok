@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2026 the cuTokenize contributors
+// Copyright 2026 the GraphTok contributors
 //
 // Host encoder for small byte-level inputs. A graph replay costs ~90 us of
 // fixed latency regardless of input size, so below a few kilobytes a single

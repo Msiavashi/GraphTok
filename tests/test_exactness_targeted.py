@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2026 the cuTokenize contributors
+# Copyright 2026 the GraphTok contributors
 """Targeted, reference-backed exactness cases for GPU BPE boundaries.
 
 These cases complement the corpus gate. They deliberately exercise the

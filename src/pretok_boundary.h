@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2026 the cuTokenize contributors
+// Copyright 2026 the GraphTok contributors
 //
 // Byte-level pre-tokenization boundary predicates, shared verbatim between
 // the GPU boundary kernels (pretok_k2_*) and the host small-input encoder.

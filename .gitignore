@@ -41,10 +41,7 @@ venv/
 # Paper sources, figures, and build artifacts (not part of the published repo)
 paper/
 
-# Local experiment workspace: paper benchmark runs, evaluation outputs, and
-# vendored competitor checkouts used for head-to-head measurement. Kept out of
-# the published repo -- tmp-baselines/ in particular holds third-party clones
-# (TokTier, GPUTok) that are not ours to redistribute.
+# Local workspaces
 evaluation/
 experiments/
 tmp-baselines/

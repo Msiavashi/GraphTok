@@ -1,4 +1,4 @@
-// C-ABI shim around cuTokenize for ctypes-based integration (e.g. vLLM).
+// C-ABI shim around GraphTok for ctypes-based integration (e.g. vLLM).
 // Exposes a minimal, stable C interface; all C++/CUDA stays internal.
 //
 // Build: see build_shim.sh -> libgtok.so

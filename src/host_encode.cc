@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2026 the cuTokenize contributors
+// Copyright 2026 the GraphTok contributors
 #include "host_encode.h"
 #include "pretok_boundary.h"
 #include "pretok_boundary_simd.h"

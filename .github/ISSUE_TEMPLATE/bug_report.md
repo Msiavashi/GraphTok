@@ -13,27 +13,31 @@ One sentence: what went wrong.
 ## Reproducer
 
 ```bash
-# exact CLI invocation
-./build/<preset>/gpu_bpe_tokenize --vocab ... --input ... --output ... ...
+./build/<preset>/gpu_bpe_tokenize --vocab ... --input ... --output ...
 ```
 
-If the issue is a bit-exactness divergence, include the input excerpt
-around the byte offset the harness reports.
+or the Python call:
+
+```python
+import gpu_bpe_tokenizer as gbpe
+tok = gbpe.Tokenizer("...")
+tok.encode("...")
+```
 
 ## Expected vs actual
 
-What the tiktoken / HF tokenizers oracle produces, what the GPU produced.
+The reference output (`tiktoken` / Hugging Face `tokenizers`) and the GraphTok output. For a token-ID mismatch, include the first differing position and the surrounding text.
 
 ## Environment
 
-- GPU SKU and compute capability: <e.g. H100 NVL, sm_90>
-- CUDA toolkit version: <`nvcc --version` first line>
-- Driver version: <`nvidia-smi` top line>
-- OS / glibc: <`lsb_release -d` and `ldd --version | head -1`>
-- CMake preset used: <e.g. `all`, `llama3`, ...>
-- `tokenizer.json` source: <URL or "vendored under data/...">
+- GraphTok version or commit:
+- GPU and compute capability: <e.g. H100, sm_90>
+- CUDA toolkit: <`nvcc --version`>
+- Driver: <`nvidia-smi`>
+- OS:
+- CMake preset or install method: <e.g. `all`, `pip install .`>
+- `tokenizer.json` source:
 
 ## Additional context
 
-- `compute-sanitizer --tool=synccheck` output (if available)
-- ncu report (if perf-related)
+`compute-sanitizer --tool=synccheck` output, logs, or anything else relevant.
