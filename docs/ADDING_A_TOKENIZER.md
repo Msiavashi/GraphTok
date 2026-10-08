@@ -28,7 +28,7 @@ scripts/test-all-presets.sh <name>
 ## Case B — a genuinely new pre-tokenizer regex
 
 A new regex means a new **boundary kernel** (the only per-vocab GPU code — see
-[ARCHITECTURE.md](ARCHITECTURE.md), "the per-vocab seam is `is_boundary[]`"). The
+[ARCHITECTURE.md](ARCHITECTURE.md) section 2.1). The
 discipline below is mandatory because a wrong boundary corrupts output silently
 on inputs the English corpus never exercises.
 
@@ -49,7 +49,7 @@ ranges. If yours needs more, extend `tools/gen_class_table.py`, regenerate
 
 **3. Translate the predicate to a `pretok_k2_<name>` kernel.**
 In `src/tokenizer.cu`, add the kernel guarded by `#if GBPE_HAVE_VOCAB_<NAME>`,
-reusing the shared helpers in `namespace pretok` (`cls_at`, `b0_at`,
+reusing the shared helpers in `namespace pretok` (`src/pretok_boundary.h`) (`cls_at`, `b0_at`,
 `starts_contraction`, the digit-run scan). Add the dispatch arm in
 `launch_pretok` and a `PretokKind` value (`tokenizer.cuh`), set it in
 `vocab.cc: build_vocab_pack`.

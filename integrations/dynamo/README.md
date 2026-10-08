@@ -23,7 +23,7 @@ cmake --preset all && cmake --build build/all -j --target gtok
 ```bash
 git clone https://github.com/ai-dynamo/dynamo.git && cd dynamo
 git checkout bae0051            # Dynamo 1.3.0
-git apply /path/to/cuTokenize/integrations/dynamo/graphtok-dynamo-1.3.0.patch
+git apply /path/to/graphtok/integrations/dynamo/graphtok-dynamo-1.3.0.patch
 cargo build --release           # or rebuild the Python bindings: cd lib/bindings/python && maturin develop --release
 cargo test -p dynamo-tokenizers --test graphtok_dispatch   # needs a GPU and DYN_GRAPHTOK_LIB
 ```
@@ -31,7 +31,7 @@ cargo test -p dynamo-tokenizers --test graphtok_dispatch   # needs a GPU and DYN
 ## Enable
 
 ```bash
-export DYN_GRAPHTOK_LIB=/path/to/cuTokenize/build/all/libgtok.so
+export DYN_GRAPHTOK_LIB=/path/to/graphtok/build/all/libgtok.so
 export DYN_TOKENIZER=graphtok          # or: python -m dynamo.frontend --tokenizer-backend graphtok
 export DYN_GRAPHTOK_DISPATCH=1         # load-adaptive dispatcher (GPU batching + CPU route)
 python -m dynamo.frontend ...
