@@ -3,7 +3,7 @@ message: "If you use this software, please cite it as below."
 title: "GraphTok"
 version: "0.3.0"
 date-released: "2026-10-09"
-repository-code: "https://github.com/Msiavashi/graphtok"
+repository-code: "https://github.com/Msiavashi/GraphTok"
 license: Apache-2.0
 authors:
   - family-names: Siavashi

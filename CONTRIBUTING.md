@@ -1,6 +1,6 @@
 # Contributing to GraphTok
 
-Issues and pull requests are welcome at https://github.com/Msiavashi/graphtok. By participating you agree to the [Code of Conduct](CODE_OF_CONDUCT.md).
+Issues and pull requests are welcome at https://github.com/Msiavashi/GraphTok. By participating you agree to the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Branch model
 

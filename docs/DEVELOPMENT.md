@@ -7,7 +7,7 @@
 - Optional: a nightly Rust `cargo` to link the gigatoken CPU engine (`-DGBPE_GIGATOKEN=AUTO|ON|OFF`).
 
 ```bash
-git clone https://github.com/Msiavashi/graphtok.git && cd graphtok
+git clone https://github.com/Msiavashi/GraphTok.git && cd graphtok
 git checkout develop
 pip install '.[test]'
 HF_TOKEN=hf_... python3 scripts/download-vocabs.py
