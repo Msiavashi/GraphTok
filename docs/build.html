@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Building - GraphTok</title>
+<meta name="description" content="GraphTok documentation: Building">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="../style.css">
+<link rel="stylesheet" href="../pygments.css">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+</head>
+<body class="docs">
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="../index.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="2.2"/><circle cx="12" cy="5" r="2.2"/><circle cx="12" cy="19" r="2.2"/><circle cx="19" cy="12" r="2.2"/><path d="M7 11l3.3-4.4M7 13l3.3 4.4M14 6.6L17 10M14 17.4L17 14"/></svg>GraphTok</a>
+    <nav>
+      <a href="../index.html">Home</a>
+      <a href="../docs/index.html" class="active">Docs</a>
+      <a href="https://github.com/Msiavashi/GraphTok">GitHub</a>
+    </nav>
+  </div>
+</header>
+<div class="wrap docs-layout">
+  <aside class="sidebar">
+    <p class="side-title">Documentation</p>
+    <ul>
+      <li><a href="index.html">Overview</a></li>
+      <li><a href="build.html" class="active">Building</a></li>
+      <li><a href="architecture.html">Architecture</a></li>
+      <li><a href="adding-a-tokenizer.html">Adding a tokenizer</a></li>
+      <li><a href="development.html">Development</a></li>
+      <li><a href="dynamo.html">NVIDIA Dynamo backend</a></li>
+      <li><a href="contributing.html">Contributing</a></li>
+      <li><a href="changelog.html">Changelog</a></li>
+      <li><a href="code-of-conduct.html">Code of conduct</a></li>
+      <li><a href="security.html">Security policy</a></li>
+    </ul>
+  </aside>
+  <main class="content">
+<h1 id="building-graphtok">Building GraphTok</h1>
+<h2 id="requirements">Requirements</h2>
+<ul>
+<li>CUDA toolkit 12.6 or newer (tested with 12.6, 12.8 and 13.1), CMake &gt;= 3.24, a C++17 host compiler.</li>
+<li>Tested GPUs: NVIDIA H100 NVL (sm_90), A100 80GB (sm_80), L40 (sm_89), RTX 5000 Ada (sm_89) and RTX A6000 (sm_86). The default build targets <code>80;90</code>; set <code>CMAKE_CUDA_ARCHITECTURES</code> (for example <code>86;89</code>) to add native code for other GPUs.</li>
+<li><code>utf8proc</code> when Qwen is enabled.</li>
+<li>Optional nightly Rust <code>cargo</code> for the gigatoken CPU engine.</li>
+<li>Python &gt;= 3.10 with <code>scikit-build-core</code> and <code>pybind11</code> for the Python module.</li>
+</ul>
+<h2 id="presets">Presets</h2>
+<div class="highlight"><pre><span></span><code>cmake<span class="w"> </span>--preset<span class="w"> </span>&lt;name&gt;<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>cmake<span class="w"> </span>--build<span class="w"> </span>build/&lt;name&gt;<span class="w"> </span>-j
+</code></pre></div>
+
+<table>
+<thead>
+<tr>
+<th>Preset</th>
+<th>Vocabularies</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>all</code></td>
+<td>GPT-2, Llama 3, DeepSeek-V3, Gemma 3</td>
+</tr>
+<tr>
+<td><code>gpt2</code></td>
+<td>GPT-2 (Slot64 only)</td>
+</tr>
+<tr>
+<td><code>llama3</code></td>
+<td>Llama 3</td>
+</tr>
+<tr>
+<td><code>qwen25</code></td>
+<td>Qwen 2.5 / Qwen 3</td>
+</tr>
+<tr>
+<td><code>deepseek_v3</code></td>
+<td>DeepSeek-V3</td>
+</tr>
+<tr>
+<td><code>bytelevel</code></td>
+<td>GPT-2, Llama 3, Qwen 2.5, DeepSeek-V3</td>
+</tr>
+<tr>
+<td><code>gemma3</code></td>
+<td>Gemma 3, GPU pre-tokenizer</td>
+</tr>
+<tr>
+<td><code>gemma3_cpu</code></td>
+<td>Gemma 3, host pre-tokenizer</td>
+</tr>
+<tr>
+<td><code>gemma3_gpu</code></td>
+<td>alias of <code>gemma3</code></td>
+</tr>
+</tbody>
+</table>
+<p>All presets are Release builds in <code>build/&lt;preset&gt;/</code> with
+<code>CMAKE_CUDA_ARCHITECTURES=80;90</code>.</p>
+<p>Targets: <code>gpu_bpe_tokenize</code> (CLI), <code>gtok</code> (<code>libgtok.so</code>), and, with
+<code>GBPE_BUILD_TESTS=ON</code>, <code>test_encode_batch_smoke</code>, <code>test_cpu_route_classifier</code>,
+<code>test_boundary_simd_equiv</code> (byte-level builds only).</p>
+<h2 id="cmake-options">CMake options</h2>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GBPE_VOCABS</code></td>
+<td><code>ALL</code></td>
+<td><code>ALL</code> or a <code>;</code>-separated subset of <code>GPT2;LLAMA3;QWEN25;DEEPSEEK_V3;GEMMA3</code>. <code>ALL</code> excludes <code>QWEN25</code>.</td>
+</tr>
+<tr>
+<td><code>GBPE_GEMMA_GPU_PRETOK</code></td>
+<td><code>ON</code></td>
+<td>graph-resident Gemma 3 pre-tokenizer</td>
+</tr>
+<tr>
+<td><code>GBPE_GIGATOKEN</code></td>
+<td><code>AUTO</code></td>
+<td>link gigatoken as the CPU engine (<code>AUTO</code>/<code>ON</code>/<code>OFF</code>)</td>
+</tr>
+<tr>
+<td><code>GBPE_BUILD_TESTS</code></td>
+<td><code>ON</code></td>
+<td>build the C++ gate executables</td>
+</tr>
+<tr>
+<td><code>GBPE_BUILD_PYTHON</code></td>
+<td><code>OFF</code></td>
+<td>build the Python module (forced on by <code>pip install</code>)</td>
+</tr>
+<tr>
+<td><code>GBPE_HOST_STATS</code></td>
+<td><code>OFF</code></td>
+<td>compile host-encoder cache counters</td>
+</tr>
+<tr>
+<td><code>CMAKE_CUDA_ARCHITECTURES</code></td>
+<td><code>80;90</code></td>
+<td>target GPU architectures</td>
+</tr>
+</tbody>
+</table>
+<p>Example:</p>
+<div class="highlight"><pre><span></span><code>cmake<span class="w"> </span>-S<span class="w"> </span>.<span class="w"> </span>-B<span class="w"> </span>build/custom<span class="w"> </span>-DGBPE_VOCABS<span class="o">=</span><span class="s2">"GPT2;QWEN25"</span><span class="w"> </span>-DCMAKE_CUDA_ARCHITECTURES<span class="o">=</span><span class="m">90</span>
+cmake<span class="w"> </span>--build<span class="w"> </span>build/custom<span class="w"> </span>-j
+</code></pre></div>
+
+<h2 id="python-module">Python module</h2>
+<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>.
+pip<span class="w"> </span>install<span class="w"> </span><span class="s1">'.[test]'</span><span class="w">      </span><span class="c1"># pytest, tiktoken, tokenizers</span>
+pip<span class="w"> </span>install<span class="w"> </span><span class="s1">'.[vllm]'</span><span class="w">      </span><span class="c1"># vLLM plugin dependencies</span>
+</code></pre></div>
+
+<p><code>pip install</code> configures CMake with <code>-DGBPE_BUILD_PYTHON=ON -DGBPE_VOCABS=ALL</code>.
+Extra CMake arguments go through <code>CMAKE_ARGS</code>, for example
+<code>CMAKE_ARGS="-DCMAKE_CUDA_ARCHITECTURES=89" pip install .</code>.</p>
+<h2 id="makefile">Makefile</h2>
+<p><code>make help</code> lists the wrappers: <code>configure</code>, <code>build</code>, <code>clean</code>, <code>run</code>, <code>test</code>,
+<code>test-all</code>, <code>python-install</code>, <code>test-python</code>, <code>test-exactness</code>, <code>sanitize</code>.
+Variables: <code>PRESET</code> (default <code>all</code>), <code>VOCAB</code> (default <code>gpt2</code>), <code>DEVICE</code>,
+<code>INPUT</code>, <code>OUTPUT</code>, <code>ARGS</code>.</p>
+  </main>
+</div>
+<footer class="foot">
+  <div class="wrap">
+    <span>GraphTok is released under the Apache License 2.0.</span>
+    <span><a href="https://github.com/Msiavashi/GraphTok">GitHub</a> &middot; <a href="https://github.com/Msiavashi/GraphTok/blob/main/LICENSE">License</a> &middot; <a href="../docs/security.html">Security</a></span>
+  </div>
+</footer>
+</body>
+</html>

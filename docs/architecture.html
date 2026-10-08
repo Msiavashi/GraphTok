@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Architecture - GraphTok</title>
+<meta name="description" content="GraphTok documentation: Architecture">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="../style.css">
+<link rel="stylesheet" href="../pygments.css">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+</head>
+<body class="docs">
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="../index.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="2.2"/><circle cx="12" cy="5" r="2.2"/><circle cx="12" cy="19" r="2.2"/><circle cx="19" cy="12" r="2.2"/><path d="M7 11l3.3-4.4M7 13l3.3 4.4M14 6.6L17 10M14 17.4L17 14"/></svg>GraphTok</a>
+    <nav>
+      <a href="../index.html">Home</a>
+      <a href="../docs/index.html" class="active">Docs</a>
+      <a href="https://github.com/Msiavashi/GraphTok">GitHub</a>
+    </nav>
+  </div>
+</header>
+<div class="wrap docs-layout">
+  <aside class="sidebar">
+    <p class="side-title">Documentation</p>
+    <ul>
+      <li><a href="index.html">Overview</a></li>
+      <li><a href="build.html">Building</a></li>
+      <li><a href="architecture.html" class="active">Architecture</a></li>
+      <li><a href="adding-a-tokenizer.html">Adding a tokenizer</a></li>
+      <li><a href="development.html">Development</a></li>
+      <li><a href="dynamo.html">NVIDIA Dynamo backend</a></li>
+      <li><a href="contributing.html">Contributing</a></li>
+      <li><a href="changelog.html">Changelog</a></li>
+      <li><a href="code-of-conduct.html">Code of conduct</a></li>
+      <li><a href="security.html">Security policy</a></li>
+    </ul>
+  </aside>
+  <main class="content">
+<h1 id="graphtok-architecture">GraphTok architecture</h1>
+<p>GraphTok encodes text with a single CUDA graph per input-size class. The graph
+contains GPU pre-tokenization, BPE merging and output assembly, so a call is
+one H2D copy, one graph replay and one D2H copy. Small inputs can instead take
+a CPU route, and a dispatcher chooses between the two under concurrent load.</p>
+<h2 id="1-host-preparation-once-per-vocabulary">1. Host preparation (once per vocabulary)</h2>
+<p><code>src/vocab.{h,cc}</code> loads a Hugging Face <code>tokenizer.json</code>, detects the
+pre-tokenizer family (<code>detect_regex_kind</code>) and builds the device-side
+<code>VocabPack</code> (<code>build_vocab_pack</code>): the byte-to-ID table, the merge table as a
+packed open-addressing hash, and added/special tokens. The hash slot layout is
+<code>Slot64</code> when vocab and merge counts fit in 16 bits (GPT-2) and <code>Slot128</code>
+otherwise (<code>SlotKind</code> in <code>src/tokenizer.cuh</code>). Single-vocab builds compile only
+the matching layout (<code>src/build_config.h</code>).</p>
+<h2 id="2-the-captured-graph-srctokenizercu">2. The captured graph (<code>src/tokenizer.cu</code>)</h2>
+<p>All workspace buffers are allocated up front for the capacity of the size
+class; the captured region performs no allocation and no host synchronization.</p>
+<h3 id="21-pre-tokenization">2.1 Pre-tokenization</h3>
+<p>Pre-token boundaries are computed in parallel as a predicate over a bounded
+codepoint window, not by a left-to-right regex scan:</p>
+<ul>
+<li><code>pretok_k1_classify</code> classifies each codepoint with the generated table
+  (<code>generated/gbpe_class_table.h</code>).</li>
+<li>A per-family boundary kernel (<code>pretok_k2_boundaries</code>,
+  <code>pretok_k2_llamaqwen</code>, <code>pretok_k2_deepseek</code>) evaluates <code>is_boundary[k]</code>,
+  using segmented run scans for constructs such as digit runs. The shared
+  rules live in <code>src/pretok_boundary.h</code> (<code>namespace pretok</code>).</li>
+<li>Prefix scans (<code>cub::DeviceScan</code>, <code>src/small_scan.cuh</code>) turn the boundary
+  flags into pre-token offsets; <code>pretok_k3_lenbucket</code> and
+  <code>pretok_k4_materialize</code> bucket pre-tokens by length and lay them out for the
+  merge kernel.</li>
+<li>Added and special tokens are matched on the GPU (<code>added_match</code>,
+  <code>added_expand_owners</code>).</li>
+</ul>
+<p>Gemma 3 (SentencePiece family) uses its own graph-resident pre-tokenizer
+(<code>sp_pretok_*</code> kernels) when built with <code>GBPE_GEMMA_GPU_PRETOK=ON</code> (default);
+with <code>OFF</code> it uses the host pre-tokenizer in <code>src/pretokenize.cc</code>.</p>
+<p>Qwen 2.5/3 declare NFC normalization. It runs on the host (utf8proc) before
+the input is copied to the device (<code>normalize_input_view</code> in
+<code>src/python_bindings.cc</code> and <code>src/gtok_shim.cc</code>).</p>
+<h3 id="22-bpe-merge">2.2 BPE merge</h3>
+<p><code>bpe_kernel&lt;LEN&gt;</code> assigns one warp per pre-token, two warps per block, for the
+two length buckets (<code>LEN</code> = 32 and 64 bytes). Each step, the warp looks up the
+rank of every adjacent pair in the merge hash, takes the minimum with a
+warp-cooperative reduction (<code>__shfl_xor_sync</code>) and applies that merge, which
+reproduces the reference merge order. Warp rules: every warp-level op runs on
+all 32 lanes with mask <code>0xFFFFFFFF</code>; inactive lanes carry dead tokens instead
+of returning early.</p>
+<p>Pre-tokens longer than the buckets go through <code>overflow_bpe_kernel</code>.</p>
+<h3 id="23-assembly">2.3 Assembly</h3>
+<p>An exclusive scan over per-pre-token output counts gives write offsets, and
+the flatten kernels (<code>flatten_all_kernel</code>, <code>flatten_direct_added_kernel</code>,
+<code>flatten_gpu_overflow_kernel</code>) write the final IDs contiguously. Batched
+encodes (<code>encode_batch</code>) additionally produce per-document offsets.</p>
+<h3 id="24-decode">2.4 Decode</h3>
+<p>Decode uses <code>decode_lens_kernel</code> and <code>decode_gather_kernel</code>, followed by the
+SentencePiece post-decoder for Gemma 3.</p>
+<h2 id="3-graph-size-classes">3. Graph size classes</h2>
+<p>A graph's cost scales with its capacity, so the Python bindings and libgtok
+keep one captured graph per power-of-two input-byte class. A class is captured
+on first use and kept; each encode replays the smallest class that fits.</p>
+<h2 id="4-cpu-route-srccpu_routehcc-srccpu_thresholdsh">4. CPU route (<code>src/cpu_route.{h,cc}</code>, <code>src/cpu_thresholds.h</code>)</h2>
+<p>Inputs at or below a byte threshold are encoded on the CPU. The threshold is
+content-aware (separate limits for mostly-ASCII and non-ASCII text). The engine
+is gigatoken (<code>rust/gtok_cpu</code>, linked when a nightly cargo is found) or the
+built-in host encoder (<code>src/host_encode.{h,cc}</code>). It is selected with
+<code>cpu_backend</code> / <code>GTOK_CPU_BACKEND</code>: <code>auto</code>, <code>gigatoken</code>, <code>host</code>, <code>off</code>.</p>
+<h2 id="5-dispatcher-srcdispatcherhcc">5. Dispatcher (<code>src/dispatcher.{h,cc}</code>)</h2>
+<p><code>Dispatcher</code> is a thread-safe encoder for many concurrent callers. A request
+the CPU route accepts runs on the caller's thread if one of <code>cpu_workers</code> CPU
+engines is free. Everything else joins a GPU queue; the first caller that finds
+no batch in flight launches everything queued as one batched graph replay, and
+requests arriving meanwhile form the next batch. There is no timer or
+background thread. Policies: <code>adaptive</code>, <code>gpu</code>, <code>cpu</code>.</p>
+<h2 id="6-interfaces">6. Interfaces</h2>
+<ul>
+<li>CLI: <code>src/main.cc</code> (<code>gpu_bpe_tokenize</code>).</li>
+<li>Python: <code>src/python_bindings.cc</code> (<code>Tokenizer</code>, <code>Dispatcher</code>) and
+  <code>python/gpu_bpe_tokenizer/</code>.</li>
+<li>C ABI: <code>src/gtok_shim.cc</code> (<code>libgtok.so</code>, exports <code>gtok_*</code> only via
+  <code>src/gtok.map</code>), used by the vLLM plugin and the Dynamo backend.</li>
+<li>Special tokens and chat templates: <code>src/special_tokens.{h,cc}</code>.</li>
+</ul>
+  </main>
+</div>
+<footer class="foot">
+  <div class="wrap">
+    <span>GraphTok is released under the Apache License 2.0.</span>
+    <span><a href="https://github.com/Msiavashi/GraphTok">GitHub</a> &middot; <a href="https://github.com/Msiavashi/GraphTok/blob/main/LICENSE">License</a> &middot; <a href="../docs/security.html">Security</a></span>
+  </div>
+</footer>
+</body>
+</html>

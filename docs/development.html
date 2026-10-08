@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Development - GraphTok</title>
+<meta name="description" content="GraphTok documentation: Development">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="../style.css">
+<link rel="stylesheet" href="../pygments.css">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+</head>
+<body class="docs">
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="../index.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="2.2"/><circle cx="12" cy="5" r="2.2"/><circle cx="12" cy="19" r="2.2"/><circle cx="19" cy="12" r="2.2"/><path d="M7 11l3.3-4.4M7 13l3.3 4.4M14 6.6L17 10M14 17.4L17 14"/></svg>GraphTok</a>
+    <nav>
+      <a href="../index.html">Home</a>
+      <a href="../docs/index.html" class="active">Docs</a>
+      <a href="https://github.com/Msiavashi/GraphTok">GitHub</a>
+    </nav>
+  </div>
+</header>
+<div class="wrap docs-layout">
+  <aside class="sidebar">
+    <p class="side-title">Documentation</p>
+    <ul>
+      <li><a href="index.html">Overview</a></li>
+      <li><a href="build.html">Building</a></li>
+      <li><a href="architecture.html">Architecture</a></li>
+      <li><a href="adding-a-tokenizer.html">Adding a tokenizer</a></li>
+      <li><a href="development.html" class="active">Development</a></li>
+      <li><a href="dynamo.html">NVIDIA Dynamo backend</a></li>
+      <li><a href="contributing.html">Contributing</a></li>
+      <li><a href="changelog.html">Changelog</a></li>
+      <li><a href="code-of-conduct.html">Code of conduct</a></li>
+      <li><a href="security.html">Security policy</a></li>
+    </ul>
+  </aside>
+  <main class="content">
+<h1 id="development">Development</h1>
+<h2 id="environment">Environment</h2>
+<ul>
+<li>Linux, an NVIDIA GPU, CUDA toolkit 12.6 or newer (tested with 12.6, 12.8 and 13.1), CMake &gt;= 3.24, a C++17 compiler, Python &gt;= 3.10.</li>
+<li><code>utf8proc</code> headers and library when Qwen is enabled.</li>
+<li>Optional: a nightly Rust <code>cargo</code> to link the gigatoken CPU engine (<code>-DGBPE_GIGATOKEN=AUTO|ON|OFF</code>).</li>
+</ul>
+<div class="highlight"><pre><span></span><code>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/Msiavashi/GraphTok.git<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">cd</span><span class="w"> </span>graphtok
+git<span class="w"> </span>checkout<span class="w"> </span>develop
+pip<span class="w"> </span>install<span class="w"> </span><span class="s1">'.[test]'</span>
+<span class="nv">HF_TOKEN</span><span class="o">=</span>hf_...<span class="w"> </span>python3<span class="w"> </span>scripts/download-vocabs.py
+</code></pre></div>
+
+<h2 id="build-variants">Build variants</h2>
+<p>Each CMake preset builds into <code>build/&lt;preset&gt;/</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Preset</th>
+<th>Vocabularies</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>all</code></td>
+<td>GPT-2, Llama 3, DeepSeek-V3, Gemma 3</td>
+</tr>
+<tr>
+<td><code>gpt2</code>, <code>llama3</code>, <code>qwen25</code>, <code>deepseek_v3</code></td>
+<td>one vocabulary each</td>
+</tr>
+<tr>
+<td><code>bytelevel</code></td>
+<td>GPT-2, Llama 3, Qwen 2.5, DeepSeek-V3</td>
+</tr>
+<tr>
+<td><code>gemma3</code>, <code>gemma3_cpu</code>, <code>gemma3_gpu</code></td>
+<td>Gemma 3</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code>cmake<span class="w"> </span>--preset<span class="w"> </span>llama3<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>cmake<span class="w"> </span>--build<span class="w"> </span>build/llama3<span class="w"> </span>-j
+cmake<span class="w"> </span>--preset<span class="w"> </span>all<span class="w"> </span>-DCMAKE_CUDA_ARCHITECTURES<span class="o">=</span><span class="m">89</span><span class="w">      </span><span class="c1"># other GPU arch</span>
+<span class="nv">CMAKE_ARGS</span><span class="o">=</span><span class="s2">"-DCMAKE_CUDA_ARCHITECTURES=89"</span><span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>.
+</code></pre></div>
+
+<p>Equivalent <code>make</code> targets: <code>make build PRESET=&lt;preset&gt;</code>, <code>make clean PRESET=&lt;preset&gt;</code>. See <a href="build.html">BUILD.md</a> for all options.</p>
+<h2 id="tests">Tests</h2>
+<p>The Python tests need a GPU, an installed module (<code>pip install '.[test]'</code>) and the vocabulary files under <code>data/</code>. Tests whose vocabulary file is missing, or whose tokenizer is not compiled into the installed build, are skipped.</p>
+<div class="highlight"><pre><span></span><code>pytest<span class="w"> </span>tests/
+pytest<span class="w"> </span>tests/test_python_bindings.py<span class="w">        </span><span class="c1"># single file</span>
+make<span class="w"> </span>test-python<span class="w"> </span><span class="nv">DEVICE</span><span class="o">=</span><span class="m">0</span><span class="w">                   </span><span class="c1"># bindings, batch and targeted exactness tests</span>
+</code></pre></div>
+
+<p>C++ test executables (<code>test_encode_batch_smoke</code>, <code>test_cpu_route_classifier</code>, <code>test_boundary_simd_equiv</code>) are built into <code>build/&lt;preset&gt;/</code> when <code>GBPE_BUILD_TESTS=ON</code> (default).</p>
+<h2 id="exactness-gate">Exactness gate</h2>
+<p>Token IDs must match <code>tiktoken</code> (GPT-2) and Hugging Face <code>tokenizers</code> (all others).</p>
+<div class="highlight"><pre><span></span><code>scripts/test-all-presets.sh<span class="w">                 </span><span class="c1"># all presets</span>
+scripts/test-all-presets.sh<span class="w"> </span>gpt2<span class="w"> </span>qwen25<span class="w">     </span><span class="c1"># selected presets</span>
+make<span class="w"> </span><span class="nb">test</span><span class="w"> </span><span class="nv">PRESET</span><span class="o">=</span>llama3<span class="w"> </span><span class="nv">DEVICE</span><span class="o">=</span><span class="m">0</span>
+make<span class="w"> </span>test-exactness<span class="w">                         </span><span class="c1"># native + Python gate with JSON report</span>
+</code></pre></div>
+
+<p><code>GBPE_EXACTNESS_DEVICE</code> selects the GPU for <code>scripts/test-all-presets.sh</code>.</p>
+<h2 id="sanitizer">Sanitizer</h2>
+<p>Run on any kernel change; it must report 0 errors:</p>
+<div class="highlight"><pre><span></span><code>compute-sanitizer<span class="w"> </span>--tool<span class="o">=</span>synccheck<span class="w"> </span>./build/all/gpu_bpe_tokenize<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--vocab<span class="w"> </span>data/hf_gpt2_tokenizer.json<span class="w"> </span>--input<span class="w"> </span>small.txt<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--output<span class="w"> </span>/tmp/out.bin<span class="w"> </span>--runs<span class="w"> </span><span class="m">1</span><span class="w"> </span>--warmup<span class="w"> </span><span class="m">0</span>
+make<span class="w"> </span>sanitize<span class="w"> </span><span class="nv">INPUT</span><span class="o">=</span>small.txt
+</code></pre></div>
+
+<h2 id="generated-character-class-table">Generated character-class table</h2>
+<p><code>generated/gbpe_class_table.h</code> is produced by <code>tools/gen_class_table.py</code> from the Python <code>regex</code> engine. Regenerate it after changing the classification rules and commit the result:</p>
+<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>regex
+python3<span class="w"> </span>tools/gen_class_table.py
+</code></pre></div>
+
+<h2 id="adding-a-tokenizer">Adding a tokenizer</h2>
+<p>See <a href="adding-a-tokenizer.html">ADDING_A_TOKENIZER.md</a>.</p>
+<h2 id="debugging-tips">Debugging tips</h2>
+<ul>
+<li><code>--no-cuda-graph</code> runs the CLI without graph capture, which makes kernel errors easier to localize.</li>
+<li><code>--runs 1 --warmup 0</code> gives a single pass for quick checks and sanitizer runs.</li>
+<li>Set <code>CUDA_LAUNCH_BLOCKING=1</code> to report CUDA errors at the failing launch.</li>
+<li>Build a single-vocabulary preset (for example <code>gpt2</code>) for faster iteration.</li>
+<li>For a token-ID mismatch, encode the same text with the reference tokenizer and find the first differing position.</li>
+</ul>
+<h2 id="code-style">Code style</h2>
+<ul>
+<li>C++/CUDA: 4-space indent, <code>snake_case</code> functions and variables, <code>PascalCase</code> types. Match the surrounding code.</li>
+<li>Warp-level operations run on all 32 lanes with an explicit <code>0xFFFFFFFFu</code> mask.</li>
+<li>The captured graph stays free of allocation and host synchronization.</li>
+<li>Python: PEP 8, 4-space indent.</li>
+<li>Comments explain why, not what.</li>
+</ul>
+<h2 id="release-process">Release process</h2>
+<ol>
+<li>On <code>develop</code>, bump <code>version</code> in <code>pyproject.toml</code> and add a <code>CHANGELOG.md</code> entry.</li>
+<li>Open a pull request from <code>develop</code> into <code>main</code> and merge it once the checks pass.</li>
+<li>Tag the merge commit and push the tag:
+   <code>bash
+   git tag vX.Y.Z &amp;&amp; git push origin vX.Y.Z</code></li>
+<li>Publish a GitHub release from the tag with the changelog entry.</li>
+</ol>
+  </main>
+</div>
+<footer class="foot">
+  <div class="wrap">
+    <span>GraphTok is released under the Apache License 2.0.</span>
+    <span><a href="https://github.com/Msiavashi/GraphTok">GitHub</a> &middot; <a href="https://github.com/Msiavashi/GraphTok/blob/main/LICENSE">License</a> &middot; <a href="../docs/security.html">Security</a></span>
+  </div>
+</footer>
+</body>
+</html>

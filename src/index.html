@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GraphTok</title>
+<meta name="description" content="GraphTok: exact BPE tokenization, end to end on the GPU, as one replayable CUDA graph.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="index.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="2.2"/><circle cx="12" cy="5" r="2.2"/><circle cx="12" cy="19" r="2.2"/><circle cx="19" cy="12" r="2.2"/><path d="M7 11l3.3-4.4M7 13l3.3 4.4M14 6.6L17 10M14 17.4L17 14"/></svg>GraphTok</a>
+    <nav>
+      <a href="index.html" class="active">Home</a>
+      <a href="docs/index.html">Docs</a>
+      <a href="https://github.com/Msiavashi/GraphTok">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="wrap">
+    <div>
+      <span class="eyebrow">v0.3.0 &middot; Apache-2.0</span>
+      <h1 class="title">GraphTok</h1>
+      <p class="tagline">Exact BPE tokenization, end to end on the GPU, as one replayable CUDA graph.</p>
+      <div class="cta">
+        <a class="btn primary" href="#quickstart">Get started
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+        <a class="btn" href="https://github.com/Msiavashi/GraphTok">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2.2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.3-1.8-1.3-1.8-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1.1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.7 1.7.3 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .5z"/></svg>
+          GitHub</a>
+      </div>
+    </div>
+    <div class="hero-code" aria-label="Python example">
+      <div class="bar"><i></i><i></i><i></i>&nbsp;encode.py</div>
+<pre><code><span class="k">import</span> gpu_bpe_tokenizer <span class="k">as</span> gbpe
+
+tok = gbpe.Tokenizer(<span class="c">"data/hf_gpt2_tokenizer.json"</span>)
+ids = tok.encode(<span class="c">"Hello, world!"</span>)             <span class="c"># list[int]</span>
+text = tok.decode(ids)
+
+tokens, offsets = tok.encode_batch([<span class="c">"first doc"</span>, <span class="c">"second doc"</span>])
+doc0 = tokens[offsets[0]:offsets[1]]</code></pre>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <h2>Why GraphTok</h2>
+    <p class="lead">A tokenizer whose hot path is entirely GPU work, built for the prompt sizes that agentic serving produces.</p>
+    <div class="cards">
+      <div class="card">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/><path d="M4 6h3M17 18h3"/></svg>
+        <h3>Bit-exact token IDs</h3>
+        <p>Output matches <code>tiktoken</code> for GPT-2 and Hugging Face <code>tokenizers</code> for every other vocabulary, byte for byte, as a hard gate on every change.</p>
+      </div>
+      <div class="card">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l2-6 4 12 2-6h6"/></svg>
+        <h3>Built for 100k to 1M tokens</h3>
+        <p>Pre-token boundaries, merges and assembly are all parallel over the sequence, so a single long prompt is one replay rather than a scan.</p>
+      </div>
+      <div class="card">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9h4M7 13h10M7 17h6"/></svg>
+        <h3>One CUDA graph replay</h3>
+        <p>Pre-allocated workspace, fixed shapes, no host synchronization inside the captured region. A call is one copy in, one replay, one copy out.</p>
+      </div>
+      <div class="card">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h10"/><circle cx="18" cy="17" r="2"/></svg>
+        <h3>Drops into vLLM and Dynamo</h3>
+        <p>A Python module, the <code>libgtok</code> C library, a vLLM general plugin and an NVIDIA Dynamo tokenizer backend share the same encoder.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <h2>How it works</h2>
+    <p class="lead">Three stages, captured once per input-size class and replayed as a single graph.</p>
+    <div class="flow">
+      <div class="step">
+        <span class="n">01 &middot; PRE-TOKENIZE</span>
+        <h3>Boundaries as a parallel predicate</h3>
+        <p>Each codepoint is classified on the GPU and a per-family boundary kernel decides <code>is_boundary[k]</code> from a bounded window. Prefix scans turn the flags into pre-token offsets.</p>
+      </div>
+      <div class="step">
+        <span class="n">02 &middot; MERGE</span>
+        <h3>Warp-cooperative BPE in reference order</h3>
+        <p>One warp per pre-token looks up every adjacent pair in a packed merge hash, takes the minimum rank with <code>__shfl_xor_sync</code> and applies it, reproducing the reference merge order exactly.</p>
+      </div>
+      <div class="step">
+        <span class="n">03 &middot; ASSEMBLE</span>
+        <h3>Scan and flatten</h3>
+        <p>An exclusive scan over per-pre-token counts gives write offsets, and the flatten kernels write the final IDs contiguously, with per-document offsets for batched encodes.</p>
+      </div>
+    </div>
+    <div class="flow-note">
+      <div><strong>CPU route.</strong> Inputs at or below a content-aware byte threshold are encoded on the host by gigatoken or the built-in encoder, with the same IDs.</div>
+      <div><strong>Dispatcher.</strong> A thread-safe encoder for many concurrent callers: small requests take a free CPU engine, everything else is batched into the next graph replay.</div>
+    </div>
+  </div>
+</section>
+
+<section class="band" id="quickstart">
+  <div class="wrap">
+    <h2>Quick start</h2>
+    <p class="lead">Linux, an NVIDIA GPU, CUDA toolkit 12.6 or newer, CMake 3.24 or newer, a C++17 compiler and Python 3.10 or newer. The full build matrix is in the <a href="docs/build.html">build guide</a>.</p>
+    <div class="quick">
+      <div>
+        <h3>Install</h3>
+<pre><code>git clone https://github.com/Msiavashi/GraphTok.git &amp;&amp; cd GraphTok
+
+# Python module
+pip install .                                   # or '.[test]' / '.[vllm]'
+
+# CLI and libgtok
+cmake --preset all &amp;&amp; cmake --build build/all -j
+
+# Vocabulary files (Llama 3 and Gemma 3 need a token with accepted licenses)
+HF_TOKEN=hf_... python3 scripts/download-vocabs.py</code></pre>
+        <h3>CLI</h3>
+<pre><code>./build/all/gpu_bpe_tokenize --vocab data/hf_gpt2_tokenizer.json \
+    --input prompt.txt --output tokens.bin</code></pre>
+      </div>
+      <div>
+        <h3>Python</h3>
+<pre><code>import gpu_bpe_tokenizer as gbpe
+
+tok = gbpe.Tokenizer("data/hf_gpt2_tokenizer.json")
+ids = tok.encode("Hello, world!")             # list[int]
+text = tok.decode(ids)
+
+tokens, offsets = tok.encode_batch(["first doc", "second doc"])
+doc0 = tokens[offsets[0]:offsets[1]]
+
+# thread-safe, load-adaptive encoder for many concurrent callers
+d = gbpe.Dispatcher("data/hf_gpt2_tokenizer.json", cpu_workers=2)
+arr = d.encode_numpy("Hello, world!")</code></pre>
+        <h3>vLLM</h3>
+<pre><code>pip install '.[vllm]'
+cmake --preset qwen25 &amp;&amp; cmake --build build/qwen25 -j --target gtok   # builds libgtok.so
+GBPE_VLLM=1 GBPE_GTOK_LIB=$PWD/build/qwen25/libgtok.so vllm serve Qwen/Qwen3-32B</code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <h2>Supported tokenizers</h2>
+    <p class="lead">Each vocabulary has a CMake preset; the <code>all</code> preset and <code>pip install .</code> build GPT-2, Llama 3, DeepSeek-V3 and Gemma 3.</p>
+    <div class="vocabs">
+      <span class="chip">GPT-2 <code>gpt2</code></span>
+      <span class="chip">Llama 3 <code>llama3</code></span>
+      <span class="chip">Qwen 2.5 / Qwen 3 <code>qwen25</code></span>
+      <span class="chip">DeepSeek-V3 <code>deepseek_v3</code></span>
+      <span class="chip">Gemma 3 <code>gemma3</code></span>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <div class="cite">
+      <div>
+        <h2>Paper and citation</h2>
+        <p>GraphTok is described in <em>Taking Tokenization off the Host for Agentic LLM Serving</em> (2026). A machine-readable <a href="https://github.com/Msiavashi/GraphTok/blob/main/CITATION.cff">CITATION.cff</a> is in the repository.</p>
+        <span class="soon">arXiv link coming soon</span>
+      </div>
+<pre><code>@misc{siavashi2026graphtok,
+  title={Taking Tokenization off the Host for Agentic {LLM} Serving},
+  author={Siavashi, Mohammad and Schwinte, Pascal and Banaei, Ali and Maguire Jr., Gerald Q. and Chiesa, Marco and Kosti{\'c}, Dejan},
+  year={2026},
+  note={arXiv preprint}
+}</code></pre>
+    </div>
+  </div>
+</section>
+
+<footer class="foot">
+  <div class="wrap">
+    <span>GraphTok is released under the Apache License 2.0.</span>
+    <span><a href="https://github.com/Msiavashi/GraphTok">GitHub</a> &middot; <a href="docs/index.html">Docs</a> &middot; <a href="https://github.com/Msiavashi/GraphTok/blob/main/LICENSE">License</a> &middot; <a href="docs/contributing.html">Contributing</a> &middot; <a href="docs/security.html">Security</a></span>
+  </div>
+</footer>
+</body>
+</html>

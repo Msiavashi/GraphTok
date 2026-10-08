@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Contributing - GraphTok</title>
+<meta name="description" content="GraphTok documentation: Contributing">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="../style.css">
+<link rel="stylesheet" href="../pygments.css">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+</head>
+<body class="docs">
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="../index.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="2.2"/><circle cx="12" cy="5" r="2.2"/><circle cx="12" cy="19" r="2.2"/><circle cx="19" cy="12" r="2.2"/><path d="M7 11l3.3-4.4M7 13l3.3 4.4M14 6.6L17 10M14 17.4L17 14"/></svg>GraphTok</a>
+    <nav>
+      <a href="../index.html">Home</a>
+      <a href="../docs/index.html" class="active">Docs</a>
+      <a href="https://github.com/Msiavashi/GraphTok">GitHub</a>
+    </nav>
+  </div>
+</header>
+<div class="wrap docs-layout">
+  <aside class="sidebar">
+    <p class="side-title">Documentation</p>
+    <ul>
+      <li><a href="index.html">Overview</a></li>
+      <li><a href="build.html">Building</a></li>
+      <li><a href="architecture.html">Architecture</a></li>
+      <li><a href="adding-a-tokenizer.html">Adding a tokenizer</a></li>
+      <li><a href="development.html">Development</a></li>
+      <li><a href="dynamo.html">NVIDIA Dynamo backend</a></li>
+      <li><a href="contributing.html" class="active">Contributing</a></li>
+      <li><a href="changelog.html">Changelog</a></li>
+      <li><a href="code-of-conduct.html">Code of conduct</a></li>
+      <li><a href="security.html">Security policy</a></li>
+    </ul>
+  </aside>
+  <main class="content">
+<h1 id="contributing-to-graphtok">Contributing to GraphTok</h1>
+<p>Issues and pull requests are welcome at https://github.com/Msiavashi/GraphTok. By participating you agree to the <a href="code-of-conduct.html">Code of Conduct</a>.</p>
+<h2 id="branch-model">Branch model</h2>
+<ul>
+<li><code>main</code> is protected and holds releases only.</li>
+<li><code>develop</code> is the integration branch.</li>
+<li>Fork the repository, branch from <code>develop</code> (<code>feature/&lt;name&gt;</code>, <code>fix/&lt;name&gt;</code>), and open the pull request against <code>develop</code>.</li>
+</ul>
+<p>See <a href="development.html">docs/DEVELOPMENT.md</a> for setup, builds and tests.</p>
+<h2 id="commit-messages">Commit messages</h2>
+<ul>
+<li>Short imperative subject line (about 72 characters), for example <code>Fix overflow path for long pre-tokens</code>.</li>
+<li>A body that explains why the change is needed when it is not obvious.</li>
+<li>Reference issues with <code>Fixes #123</code> where applicable.</li>
+<li>One logical change per commit.</li>
+</ul>
+<h2 id="pull-request-checklist">Pull request checklist</h2>
+<ul>
+<li>[ ] The affected CMake presets compile (<code>cmake --preset &lt;preset&gt; &amp;&amp; cmake --build build/&lt;preset&gt; -j</code>).</li>
+<li>[ ] <code>pytest tests/</code> passes on a GPU.</li>
+<li>[ ] Token IDs stay identical to the reference tokenizers: <code>scripts/test-all-presets.sh</code> exits 0.</li>
+<li>[ ] Kernel changes: <code>compute-sanitizer --tool=synccheck</code> reports 0 errors.</li>
+<li>[ ] Documentation is updated.</li>
+<li>[ ] <code>CHANGELOG.md</code> has an entry.</li>
+</ul>
+<p>Changes to the pre-tokenizer, merge kernel, slot layouts or CPU route must keep token IDs identical to <code>tiktoken</code> (GPT-2) and Hugging Face <code>tokenizers</code>.</p>
+<h2 id="reporting-bugs">Reporting bugs</h2>
+<p>Open an issue with the bug report template and include:</p>
+<ul>
+<li>The exact CLI invocation or Python call.</li>
+<li>The input, or a small sample that reproduces it.</li>
+<li>The <code>tokenizer.json</code> or its source.</li>
+<li>The build preset, GPU model, CUDA toolkit and driver versions.</li>
+<li>For a token-ID mismatch: the reference output, the GraphTok output, and the first differing position with the surrounding text.</li>
+</ul>
+<p>Report security issues privately as described in <a href="security.html">SECURITY.md</a>.</p>
+<h2 id="adding-a-tokenizer">Adding a tokenizer</h2>
+<p>Follow <a href="adding-a-tokenizer.html">docs/ADDING_A_TOKENIZER.md</a>. A new tokenizer needs a preset, a vocabulary download entry and an exactness check against its reference tokenizer.</p>
+<h2 id="code-style">Code style</h2>
+<ul>
+<li>C++/CUDA: 4-space indent, <code>snake_case</code> functions and variables, <code>PascalCase</code> types. Match the surrounding code.</li>
+<li>Warp-level operations run on all 32 lanes with an explicit <code>0xFFFFFFFFu</code> mask (see <a href="architecture.html">docs/ARCHITECTURE.md</a>).</li>
+<li>The captured graph must stay free of allocation and host synchronization.</li>
+<li>Python: PEP 8, 4-space indent.</li>
+<li>Comments explain why, not what.</li>
+</ul>
+<h2 id="license">License</h2>
+<p>Contributions are licensed under the Apache License 2.0, the same as the project. See <a href="https://github.com/Msiavashi/GraphTok/blob/main/LICENSE">LICENSE</a>. A <code>Signed-off-by</code> line (<code>git commit -s</code>) is welcome.</p>
+  </main>
+</div>
+<footer class="foot">
+  <div class="wrap">
+    <span>GraphTok is released under the Apache License 2.0.</span>
+    <span><a href="https://github.com/Msiavashi/GraphTok">GitHub</a> &middot; <a href="https://github.com/Msiavashi/GraphTok/blob/main/LICENSE">License</a> &middot; <a href="../docs/security.html">Security</a></span>
+  </div>
+</footer>
+</body>
+</html>

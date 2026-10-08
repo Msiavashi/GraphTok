@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Overview - GraphTok</title>
+<meta name="description" content="GraphTok documentation: Overview">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="../style.css">
+<link rel="stylesheet" href="../pygments.css">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+</head>
+<body class="docs">
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="../index.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="2.2"/><circle cx="12" cy="5" r="2.2"/><circle cx="12" cy="19" r="2.2"/><circle cx="19" cy="12" r="2.2"/><path d="M7 11l3.3-4.4M7 13l3.3 4.4M14 6.6L17 10M14 17.4L17 14"/></svg>GraphTok</a>
+    <nav>
+      <a href="../index.html">Home</a>
+      <a href="../docs/index.html" class="active">Docs</a>
+      <a href="https://github.com/Msiavashi/GraphTok">GitHub</a>
+    </nav>
+  </div>
+</header>
+<div class="wrap docs-layout">
+  <aside class="sidebar">
+    <p class="side-title">Documentation</p>
+    <ul>
+      <li><a href="index.html" class="active">Overview</a></li>
+      <li><a href="build.html">Building</a></li>
+      <li><a href="architecture.html">Architecture</a></li>
+      <li><a href="adding-a-tokenizer.html">Adding a tokenizer</a></li>
+      <li><a href="development.html">Development</a></li>
+      <li><a href="dynamo.html">NVIDIA Dynamo backend</a></li>
+      <li><a href="contributing.html">Contributing</a></li>
+      <li><a href="changelog.html">Changelog</a></li>
+      <li><a href="code-of-conduct.html">Code of conduct</a></li>
+      <li><a href="security.html">Security policy</a></li>
+    </ul>
+  </aside>
+  <main class="content">
+<h1 id="graphtok">GraphTok</h1>
+<p>GraphTok is a BPE tokenizer that runs end to end on an NVIDIA GPU. Pre-tokenization, BPE merging and output assembly are captured as one replayable CUDA graph, and token IDs are bit-identical to the reference tokenizers (<code>tiktoken</code> for GPT-2, Hugging Face <code>tokenizers</code> for the rest). Small inputs can be routed to a CPU engine, and a load-adaptive dispatcher batches concurrent requests into single graph replays. Repository: https://github.com/Msiavashi/GraphTok.</p>
+<ul>
+<li><strong>Exact:</strong> token IDs match the reference tokenizer bit for bit.</li>
+<li><strong>Built for long contexts:</strong> encodes 100k to 1M-token prompts in one graph replay.</li>
+<li><strong>Drop-in for serving:</strong> a Python module, a C library, a vLLM plugin and an NVIDIA Dynamo backend.</li>
+</ul>
+<p>Names: Python module <code>gpu_bpe_tokenizer</code>, C library <code>libgtok</code>, CLI <code>gpu_bpe_tokenize</code>.</p>
+<h2 id="news">News</h2>
+<ul>
+<li><strong>2026-10</strong> — v0.3.0, the first public release: GPU tokenizer, Python bindings, <code>libgtok</code> C ABI, vLLM plugin and NVIDIA Dynamo backend patch.</li>
+<li><strong>2026-10</strong> — Paper "Taking Tokenization off the Host for Agentic LLM Serving" on arXiv (arXiv link coming soon).</li>
+</ul>
+<h2 id="supported-tokenizers">Supported tokenizers</h2>
+<table>
+<thead>
+<tr>
+<th>Tokenizer</th>
+<th>CMake preset</th>
+<th>Vocab file</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GPT-2</td>
+<td><code>gpt2</code></td>
+<td><code>data/hf_gpt2_tokenizer.json</code></td>
+</tr>
+<tr>
+<td>Llama 3</td>
+<td><code>llama3</code></td>
+<td><code>data/llama3_tokenizer.json</code></td>
+</tr>
+<tr>
+<td>Qwen 2.5 / Qwen 3</td>
+<td><code>qwen25</code></td>
+<td><code>data/vocabs/qwen25.json</code></td>
+</tr>
+<tr>
+<td>DeepSeek-V3</td>
+<td><code>deepseek_v3</code></td>
+<td><code>data/vocabs/deepseek_v3.json</code></td>
+</tr>
+<tr>
+<td>Gemma 3</td>
+<td><code>gemma3</code></td>
+<td><code>data/vocabs/gemma3.json</code></td>
+</tr>
+</tbody>
+</table>
+<p>The <code>all</code> preset (and <code>pip install .</code>) builds GPT-2, Llama 3, DeepSeek-V3 and Gemma 3. Build Qwen with the <code>qwen25</code> preset. See <a href="build.html">docs/BUILD.md</a> for every preset and option.</p>
+<h2 id="quick-start">Quick start</h2>
+<p>Requirements: Linux, an NVIDIA GPU, CUDA toolkit 12.6 or newer (tested with 12.6, 12.8 and 13.1), CMake &gt;= 3.24, a C++17 compiler, Python &gt;= 3.10 (<code>utf8proc</code> when Qwen is enabled).</p>
+<div class="highlight"><pre><span></span><code>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/Msiavashi/GraphTok.git<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">cd</span><span class="w"> </span>GraphTok
+
+<span class="c1"># Python module</span>
+pip<span class="w"> </span>install<span class="w"> </span>.<span class="w">                                   </span><span class="c1"># or '.[test]' / '.[vllm]'</span>
+
+<span class="c1"># CLI and libgtok</span>
+cmake<span class="w"> </span>--preset<span class="w"> </span>all<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>cmake<span class="w"> </span>--build<span class="w"> </span>build/all<span class="w"> </span>-j
+
+<span class="c1"># Vocabulary files (Llama 3 and Gemma 3 need a token with accepted licenses)</span>
+<span class="nv">HF_TOKEN</span><span class="o">=</span>hf_...<span class="w"> </span>python3<span class="w"> </span>scripts/download-vocabs.py
+</code></pre></div>
+
+<p>Encode a file with the CLI:</p>
+<div class="highlight"><pre><span></span><code>./build/all/gpu_bpe_tokenize<span class="w"> </span>--vocab<span class="w"> </span>data/hf_gpt2_tokenizer.json<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--input<span class="w"> </span>prompt.txt<span class="w"> </span>--output<span class="w"> </span>tokens.bin
+</code></pre></div>
+
+<p>Encode in Python:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">gpu_bpe_tokenizer</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">gbpe</span>
+
+<span class="n">tok</span> <span class="o">=</span> <span class="n">gbpe</span><span class="o">.</span><span class="n">Tokenizer</span><span class="p">(</span><span class="s2">"data/hf_gpt2_tokenizer.json"</span><span class="p">)</span>
+<span class="n">ids</span> <span class="o">=</span> <span class="n">tok</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">"Hello, world!"</span><span class="p">)</span>             <span class="c1"># list[int]</span>
+<span class="n">text</span> <span class="o">=</span> <span class="n">tok</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="n">ids</span><span class="p">)</span>
+
+<span class="n">tokens</span><span class="p">,</span> <span class="n">offsets</span> <span class="o">=</span> <span class="n">tok</span><span class="o">.</span><span class="n">encode_batch</span><span class="p">([</span><span class="s2">"first doc"</span><span class="p">,</span> <span class="s2">"second doc"</span><span class="p">])</span>
+<span class="n">doc0</span> <span class="o">=</span> <span class="n">tokens</span><span class="p">[</span><span class="n">offsets</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span><span class="n">offsets</span><span class="p">[</span><span class="mi">1</span><span class="p">]]</span>
+
+<span class="c1"># thread-safe, load-adaptive encoder for many concurrent callers</span>
+<span class="n">d</span> <span class="o">=</span> <span class="n">gbpe</span><span class="o">.</span><span class="n">Dispatcher</span><span class="p">(</span><span class="s2">"data/hf_gpt2_tokenizer.json"</span><span class="p">,</span> <span class="n">cpu_workers</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+<span class="n">arr</span> <span class="o">=</span> <span class="n">d</span><span class="o">.</span><span class="n">encode_numpy</span><span class="p">(</span><span class="s2">"Hello, world!"</span><span class="p">)</span>
+</code></pre></div>
+
+<h2 id="useful-commands">Useful commands</h2>
+<table>
+<thead>
+<tr>
+<th>Task</th>
+<th>Command</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Configure and build a preset</td>
+<td><code>cmake --preset &lt;preset&gt; &amp;&amp; cmake --build build/&lt;preset&gt; -j</code></td>
+</tr>
+<tr>
+<td>Build for another GPU arch</td>
+<td><code>cmake --preset all -DCMAKE_CUDA_ARCHITECTURES=89</code></td>
+</tr>
+<tr>
+<td>Build only <code>libgtok</code></td>
+<td><code>cmake --build build/all -j --target gtok</code></td>
+</tr>
+<tr>
+<td>Install the Python module</td>
+<td><code>pip install .</code> (tests: <code>pip install '.[test]'</code>)</td>
+</tr>
+<tr>
+<td>Download vocabularies</td>
+<td><code>python3 scripts/download-vocabs.py</code> (<code>--force</code> re-downloads)</td>
+</tr>
+<tr>
+<td>Encode a file</td>
+<td><code>./build/all/gpu_bpe_tokenize --vocab &lt;json&gt; --input &lt;txt&gt; --output &lt;bin&gt;</code></td>
+</tr>
+<tr>
+<td>Encode several files in one replay</td>
+<td><code>... --inputs a.txt,b.txt --output tokens.bin</code></td>
+</tr>
+<tr>
+<td>Chat template with BOS</td>
+<td><code>... --vocab data/llama3_tokenizer.json --chat chat.json --add-bos --output tokens.bin</code></td>
+</tr>
+<tr>
+<td>Decode IDs back to text</td>
+<td><code>... --decode --input tokens.bin --output text.txt</code></td>
+</tr>
+<tr>
+<td>CLI help</td>
+<td><code>./build/all/gpu_bpe_tokenize --help</code></td>
+</tr>
+<tr>
+<td>Python tests</td>
+<td><code>pytest tests/</code></td>
+</tr>
+<tr>
+<td>Exactness gate (all / selected presets)</td>
+<td><code>scripts/test-all-presets.sh</code> / <code>scripts/test-all-presets.sh gpt2 qwen25</code></td>
+</tr>
+<tr>
+<td>CUDA synccheck</td>
+<td><code>compute-sanitizer --tool=synccheck ./build/all/gpu_bpe_tokenize --vocab data/hf_gpt2_tokenizer.json --input small.txt --output /tmp/out.bin --runs 1 --warmup 0</code></td>
+</tr>
+</tbody>
+</table>
+<p>The <code>Makefile</code> wraps the common workflows; <code>make help</code> lists them:</p>
+<table>
+<thead>
+<tr>
+<th>Target</th>
+<th>Does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>make build PRESET=llama3</code></td>
+<td>configure and build a preset</td>
+</tr>
+<tr>
+<td><code>make run INPUT=prompt.txt OUTPUT=/tmp/tokens.bin VOCAB=llama3</code></td>
+<td>tokenize a file</td>
+</tr>
+<tr>
+<td><code>make test PRESET=llama3</code> / <code>make test-all</code></td>
+<td>exactness gate for one / all presets</td>
+</tr>
+<tr>
+<td><code>make python-install</code> / <code>make test-python</code></td>
+<td>install the module / run the Python tests</td>
+</tr>
+<tr>
+<td><code>make test-exactness</code></td>
+<td>full native + Python exactness gate</td>
+</tr>
+<tr>
+<td><code>make sanitize INPUT=small.txt</code></td>
+<td>CUDA synccheck</td>
+</tr>
+<tr>
+<td><code>make clean</code></td>
+<td>clean the selected preset</td>
+</tr>
+</tbody>
+</table>
+<h2 id="integrations">Integrations</h2>
+<p><strong>vLLM.</strong> The package registers a <code>vllm.general_plugins</code> entry point that routes string <code>encode</code> / <code>__call__</code> through <code>libgtok.so</code>.</p>
+<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">'.[vllm]'</span>
+cmake<span class="w"> </span>--preset<span class="w"> </span>qwen25<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>cmake<span class="w"> </span>--build<span class="w"> </span>build/qwen25<span class="w"> </span>-j<span class="w"> </span>--target<span class="w"> </span>gtok<span class="w">   </span><span class="c1"># builds libgtok.so</span>
+<span class="nv">GBPE_VLLM</span><span class="o">=</span><span class="m">1</span><span class="w"> </span><span class="nv">GBPE_GTOK_LIB</span><span class="o">=</span><span class="nv">$PWD</span>/build/qwen25/libgtok.so<span class="w"> </span>vllm<span class="w"> </span>serve<span class="w"> </span>Qwen/Qwen3-32B
+</code></pre></div>
+
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GBPE_VLLM</code></td>
+<td><code>1</code> activates the plugin</td>
+</tr>
+<tr>
+<td><code>GBPE_GTOK_LIB</code></td>
+<td>path to <code>libgtok.so</code> (default: next to the module)</td>
+</tr>
+<tr>
+<td><code>GBPE_GTOK_MAX_BYTES</code></td>
+<td>initial byte capacity of the GPU context (default 1 MiB, grown on demand)</td>
+</tr>
+<tr>
+<td><code>GBPE_GTOK_PYLIST_DIR</code></td>
+<td>optional directory with the <code>gtok_pylist</code> C extension</td>
+</tr>
+</tbody>
+</table>
+<p><strong>NVIDIA Dynamo.</strong> See <a href="dynamo.html">integrations/dynamo/README.md</a>.</p>
+<h2 id="development">Development</h2>
+<p>Development happens on the <code>develop</code> branch and pull requests target <code>develop</code>; <code>main</code> holds releases. See <a href="development.html">docs/DEVELOPMENT.md</a> for the environment, tests and release process, and <a href="contributing.html">CONTRIBUTING.md</a> before opening a pull request.</p>
+<h2 id="documentation">Documentation</h2>
+<ul>
+<li><a href="build.html">docs/BUILD.md</a> — build presets and options</li>
+<li><a href="architecture.html">docs/ARCHITECTURE.md</a> — design of the GPU pipeline</li>
+<li><a href="adding-a-tokenizer.html">docs/ADDING_A_TOKENIZER.md</a> — adding a vocabulary</li>
+<li><a href="development.html">docs/DEVELOPMENT.md</a> — development workflow</li>
+<li><a href="changelog.html">CHANGELOG.md</a> — release history</li>
+</ul>
+<h2 id="citation">Citation</h2>
+<div class="highlight"><pre><span></span><code><span class="nc">@misc</span><span class="p">{</span><span class="nl">siavashi2026graphtok</span><span class="p">,</span>
+<span class="w">  </span><span class="na">title</span><span class="p">=</span><span class="s">{Taking Tokenization off the Host for Agentic {LLM} Serving}</span><span class="p">,</span>
+<span class="w">  </span><span class="na">author</span><span class="p">=</span><span class="s">{Siavashi, Mohammad and Schwinte, Pascal and Banaei, Ali and Maguire Jr., Gerald Q. and Chiesa, Marco and Kosti{\'c}, Dejan}</span><span class="p">,</span>
+<span class="w">  </span><span class="na">year</span><span class="p">=</span><span class="s">{2026}</span><span class="p">,</span>
+<span class="w">  </span><span class="na">note</span><span class="p">=</span><span class="s">{arXiv preprint}</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>A machine-readable <a href="https://github.com/Msiavashi/GraphTok/blob/main/CITATION.cff"><code>CITATION.cff</code></a> is also provided.</p>
+<h2 id="license">License</h2>
+<p>Apache License 2.0. See <a href="https://github.com/Msiavashi/GraphTok/blob/main/LICENSE">LICENSE</a> and <a href="https://github.com/Msiavashi/GraphTok/blob/main/NOTICE">NOTICE</a>.</p>
+  </main>
+</div>
+<footer class="foot">
+  <div class="wrap">
+    <span>GraphTok is released under the Apache License 2.0.</span>
+    <span><a href="https://github.com/Msiavashi/GraphTok">GitHub</a> &middot; <a href="https://github.com/Msiavashi/GraphTok/blob/main/LICENSE">License</a> &middot; <a href="../docs/security.html">Security</a></span>
+  </div>
+</footer>
+</body>
+</html>

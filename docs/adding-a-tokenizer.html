@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Adding a tokenizer - GraphTok</title>
+<meta name="description" content="GraphTok documentation: Adding a tokenizer">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="../style.css">
+<link rel="stylesheet" href="../pygments.css">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+</head>
+<body class="docs">
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="../index.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="2.2"/><circle cx="12" cy="5" r="2.2"/><circle cx="12" cy="19" r="2.2"/><circle cx="19" cy="12" r="2.2"/><path d="M7 11l3.3-4.4M7 13l3.3 4.4M14 6.6L17 10M14 17.4L17 14"/></svg>GraphTok</a>
+    <nav>
+      <a href="../index.html">Home</a>
+      <a href="../docs/index.html" class="active">Docs</a>
+      <a href="https://github.com/Msiavashi/GraphTok">GitHub</a>
+    </nav>
+  </div>
+</header>
+<div class="wrap docs-layout">
+  <aside class="sidebar">
+    <p class="side-title">Documentation</p>
+    <ul>
+      <li><a href="index.html">Overview</a></li>
+      <li><a href="build.html">Building</a></li>
+      <li><a href="architecture.html">Architecture</a></li>
+      <li><a href="adding-a-tokenizer.html" class="active">Adding a tokenizer</a></li>
+      <li><a href="development.html">Development</a></li>
+      <li><a href="dynamo.html">NVIDIA Dynamo backend</a></li>
+      <li><a href="contributing.html">Contributing</a></li>
+      <li><a href="changelog.html">Changelog</a></li>
+      <li><a href="code-of-conduct.html">Code of conduct</a></li>
+      <li><a href="security.html">Security policy</a></li>
+    </ul>
+  </aside>
+  <main class="content">
+<h1 id="adding-a-tokenizer">Adding a Tokenizer</h1>
+<p>Two cases. Pick the one that matches your vocab.</p>
+<h2 id="case-a-same-pre-tokenizer-family-as-an-existing-vocab">Case A — same pre-tokenizer family as an existing vocab</h2>
+<p>If your <code>tokenizer.json</code> uses a pre-tokenizer regex <strong>identical</strong> to GPT-2,
+Llama-3, Qwen-2.5, or DeepSeek-V3 (most byte-level BPE models do), there is
+<strong>no boundary-kernel change</strong>. Its AddedVocabulary entries also work without
+new code when they are literal, have no <code>single_word</code>/strip flags, use an
+identity normalizer (or the existing ASCII-stable NFC case), and no literal
+start byte occurs inside another literal. Other semantics are rejected during
+vocabulary loading; add a shared matcher capability rather than embedding it
+in the family regex kernel.</p>
+<div class="highlight"><pre><span></span><code>gpu_bpe_tokenize<span class="w"> </span>--vocab<span class="w"> </span>path/to/tokenizer.json<span class="w"> </span>--input<span class="w"> </span>text.txt<span class="w"> </span>--output<span class="w"> </span>ids.bin
+</code></pre></div>
+
+<p>The loader detects the family from the <code>pre_tokenizer</code> field
+(<code>vocab.cc: detect_regex_kind</code>) and picks the merge-table slot layout from the
+vocab size automatically. Verify bit-exactness against your reference:</p>
+<div class="highlight"><pre><span></span><code>scripts/test-all-presets.sh<span class="w"> </span>&lt;name&gt;
+</code></pre></div>
+
+<h2 id="case-b-a-genuinely-new-pre-tokenizer-regex">Case B — a genuinely new pre-tokenizer regex</h2>
+<p>A new regex means a new <strong>boundary kernel</strong> (the only per-vocab GPU code — see
+<a href="architecture.html">ARCHITECTURE.md</a> section 2.1). The
+discipline below is mandatory because a wrong boundary corrupts output silently
+on inputs the English corpus never exercises.</p>
+<p><strong>1. Prove the predicate in Python first — before any CUDA.</strong>
+Write a Python reference module exporting <code>ORACLE_PAT</code> (the regex) and
+<code>ref_pretokenize_&lt;name&gt;(text) -&gt; [(start,end)]</code> (a <em>parallel</em> boundary predicate:
+<code>is_boundary[k]</code> from a bounded codepoint window + segmented run-scans, never a
+serial cursor). Diff it against the regex on a corpus plus an edge set until it matches.</p>
+<p>Include long-run edge cases (long digit runs, CJK, CRLF) — these expose
+window-collapse bugs the corpus hides.</p>
+<p><strong>2. Extend the class table if you need new character classes.</strong>
+GPT-2/Llama/Qwen need only L/N/whitespace. DeepSeek added <code>\p{M}\p{P}\p{S}</code> + CJK
+ranges. If yours needs more, extend <code>tools/gen_class_table.py</code>, regenerate
+<code>generated/gbpe_class_table.h</code>, and confirm the exhaustive validation reports
+<code>0 mismatches</code> vs the reference engine.</p>
+<p><strong>3. Translate the predicate to a <code>pretok_k2_&lt;name&gt;</code> kernel.</strong>
+In <code>src/tokenizer.cu</code>, add the kernel guarded by <code>#if GBPE_HAVE_VOCAB_&lt;NAME&gt;</code>,
+reusing the shared helpers in <code>namespace pretok</code> (<code>src/pretok_boundary.h</code>) (<code>cls_at</code>, <code>b0_at</code>,
+<code>starts_contraction</code>, the digit-run scan). Add the dispatch arm in
+<code>launch_pretok</code> and a <code>PretokKind</code> value (<code>tokenizer.cuh</code>), set it in
+<code>vocab.cc: build_vocab_pack</code>.</p>
+<p><strong>4. Wire the build.</strong> Add the vocab to <code>CMakeLists.txt</code> (<code>GBPE_KNOWN_VOCABS</code>)
+and <code>CMakePresets.json</code>. Single-vocab presets must compile only your kernel.</p>
+<p><strong>5. Gate it end-to-end</strong> (not just the Python predicate):</p>
+<div class="highlight"><pre><span></span><code>cmake<span class="w"> </span>--preset<span class="w"> </span>&lt;name&gt;<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>cmake<span class="w"> </span>--build<span class="w"> </span>build/&lt;name&gt;<span class="w"> </span>-j
+scripts/test-all-presets.sh<span class="w"> </span>&lt;name&gt;
+compute-sanitizer<span class="w"> </span>--tool<span class="w"> </span>memcheck<span class="w"> </span>build/&lt;name&gt;/gpu_bpe_tokenize<span class="w"> </span>--vocab<span class="w"> </span>...<span class="w"> </span>--input<span class="w"> </span>...<span class="w"> </span>--output<span class="w"> </span>...<span class="w"> </span>--runs<span class="w"> </span><span class="m">1</span><span class="w"> </span>--warmup<span class="w"> </span><span class="m">0</span>
+</code></pre></div>
+
+<p>Bit-exact on all size rungs + 0 sanitizer errors, or it doesn't land.</p>
+  </main>
+</div>
+<footer class="foot">
+  <div class="wrap">
+    <span>GraphTok is released under the Apache License 2.0.</span>
+    <span><a href="https://github.com/Msiavashi/GraphTok">GitHub</a> &middot; <a href="https://github.com/Msiavashi/GraphTok/blob/main/LICENSE">License</a> &middot; <a href="../docs/security.html">Security</a></span>
+  </div>
+</footer>
+</body>
+</html>

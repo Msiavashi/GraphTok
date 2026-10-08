@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NVIDIA Dynamo backend - GraphTok</title>
+<meta name="description" content="GraphTok documentation: NVIDIA Dynamo backend">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="../style.css">
+<link rel="stylesheet" href="../pygments.css">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+</head>
+<body class="docs">
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="../index.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="2.2"/><circle cx="12" cy="5" r="2.2"/><circle cx="12" cy="19" r="2.2"/><circle cx="19" cy="12" r="2.2"/><path d="M7 11l3.3-4.4M7 13l3.3 4.4M14 6.6L17 10M14 17.4L17 14"/></svg>GraphTok</a>
+    <nav>
+      <a href="../index.html">Home</a>
+      <a href="../docs/index.html" class="active">Docs</a>
+      <a href="https://github.com/Msiavashi/GraphTok">GitHub</a>
+    </nav>
+  </div>
+</header>
+<div class="wrap docs-layout">
+  <aside class="sidebar">
+    <p class="side-title">Documentation</p>
+    <ul>
+      <li><a href="index.html">Overview</a></li>
+      <li><a href="build.html">Building</a></li>
+      <li><a href="architecture.html">Architecture</a></li>
+      <li><a href="adding-a-tokenizer.html">Adding a tokenizer</a></li>
+      <li><a href="development.html">Development</a></li>
+      <li><a href="dynamo.html" class="active">NVIDIA Dynamo backend</a></li>
+      <li><a href="contributing.html">Contributing</a></li>
+      <li><a href="changelog.html">Changelog</a></li>
+      <li><a href="code-of-conduct.html">Code of conduct</a></li>
+      <li><a href="security.html">Security policy</a></li>
+    </ul>
+  </aside>
+  <main class="content">
+<h1 id="graphtok-backend-for-nvidia-dynamo-130">GraphTok backend for NVIDIA Dynamo 1.3.0</h1>
+<p><code>graphtok-dynamo-1.3.0.patch</code> adds a <code>graphtok</code> tokenizer backend to the
+Dynamo frontend. Prompt encoding runs on the GPU through <code>libgtok.so</code> (the C
+ABI of this repository); decoding stays with Hugging Face <code>tokenizers</code>.</p>
+<p>It adds <code>lib/tokenizers/src/graphtok.rs</code> (backend, loaded with <code>libloading</code>),
+<code>lib/tokenizers/tests/graphtok_dispatch.rs</code>, wires the backend into
+<code>lib/llm/src/model_card.rs</code>, and adds <code>graphtok</code> to the frontend's
+<code>--tokenizer-backend</code> choices.</p>
+<h2 id="build-libgtokso">Build libgtok.so</h2>
+<p>From the root of this repository:</p>
+<div class="highlight"><pre><span></span><code>cmake<span class="w"> </span>--preset<span class="w"> </span>all<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>cmake<span class="w"> </span>--build<span class="w"> </span>build/all<span class="w"> </span>-j<span class="w"> </span>--target<span class="w"> </span>gtok
+<span class="c1"># -&gt; build/all/libgtok.so</span>
+</code></pre></div>
+
+<h2 id="apply-and-build-dynamo">Apply and build Dynamo</h2>
+<div class="highlight"><pre><span></span><code>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/ai-dynamo/dynamo.git<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">cd</span><span class="w"> </span>dynamo
+git<span class="w"> </span>checkout<span class="w"> </span>bae0051<span class="w">            </span><span class="c1"># Dynamo 1.3.0</span>
+git<span class="w"> </span>apply<span class="w"> </span>/path/to/graphtok/integrations/dynamo/graphtok-dynamo-1.3.0.patch
+cargo<span class="w"> </span>build<span class="w"> </span>--release<span class="w">           </span><span class="c1"># or rebuild the Python bindings: cd lib/bindings/python &amp;&amp; maturin develop --release</span>
+cargo<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-p<span class="w"> </span>dynamo-tokenizers<span class="w"> </span>--test<span class="w"> </span>graphtok_dispatch<span class="w">   </span><span class="c1"># needs a GPU and DYN_GRAPHTOK_LIB</span>
+</code></pre></div>
+
+<h2 id="enable">Enable</h2>
+<div class="highlight"><pre><span></span><code><span class="nb">export</span><span class="w"> </span><span class="nv">DYN_GRAPHTOK_LIB</span><span class="o">=</span>/path/to/graphtok/build/all/libgtok.so
+<span class="nb">export</span><span class="w"> </span><span class="nv">DYN_TOKENIZER</span><span class="o">=</span>graphtok<span class="w">          </span><span class="c1"># or: python -m dynamo.frontend --tokenizer-backend graphtok</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">DYN_GRAPHTOK_DISPATCH</span><span class="o">=</span><span class="m">1</span><span class="w">         </span><span class="c1"># load-adaptive dispatcher (GPU batching + CPU route)</span>
+python<span class="w"> </span>-m<span class="w"> </span>dynamo.frontend<span class="w"> </span>...
+</code></pre></div>
+
+<p><code>libgtok.so</code> is located through <code>DYN_GRAPHTOK_LIB</code>; when unset, <code>libgtok.so</code>
+is resolved by the dynamic loader (<code>LD_LIBRARY_PATH</code>, rpath, system paths).</p>
+<p>Other knobs:</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>DYN_GRAPHTOK_CONTEXTS</code></td>
+<td>4</td>
+<td>GPU contexts in the pool (without the dispatcher)</td>
+</tr>
+<tr>
+<td><code>DYN_GRAPHTOK_MAX_BYTES</code></td>
+<td>2 MiB</td>
+<td>largest input a context is sized for; larger inputs use Hugging Face</td>
+</tr>
+<tr>
+<td><code>DYN_GRAPHTOK_DISPATCH_CPU_WORKERS</code></td>
+<td>1</td>
+<td>CPU engines used by the dispatcher for small inputs</td>
+</tr>
+</tbody>
+</table>
+<p>On construction the backend encodes a probe containing chat-template special
+tokens with both GraphTok and Hugging Face and refuses to load if the ids
+differ (the frontend then falls back to Hugging Face).</p>
+  </main>
+</div>
+<footer class="foot">
+  <div class="wrap">
+    <span>GraphTok is released under the Apache License 2.0.</span>
+    <span><a href="https://github.com/Msiavashi/GraphTok">GitHub</a> &middot; <a href="https://github.com/Msiavashi/GraphTok/blob/main/LICENSE">License</a> &middot; <a href="../docs/security.html">Security</a></span>
+  </div>
+</footer>
+</body>
+</html>
