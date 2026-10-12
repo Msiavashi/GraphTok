@@ -40,6 +40,7 @@
   </aside>
   <main class="content">
 <h1 id="graphtok">GraphTok</h1>
+<p><strong>Website and docs:</strong> https://msiavashi.github.io/GraphTok/</p>
 <p>GraphTok is a BPE tokenizer that runs end to end on an NVIDIA GPU. Pre-tokenization, BPE merging and output assembly are captured as one replayable CUDA graph, and token IDs are bit-identical to the reference tokenizers (<code>tiktoken</code> for GPT-2, Hugging Face <code>tokenizers</code> for the rest). Small inputs can be routed to a CPU engine, and a load-adaptive dispatcher batches concurrent requests into single graph replays. Repository: https://github.com/Msiavashi/GraphTok.</p>
 <ul>
 <li><strong>Exact:</strong> token IDs match the reference tokenizer bit for bit.</li>
