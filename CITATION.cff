@@ -17,13 +17,14 @@ authors:
     name-suffix: Jr.
   - family-names: Chiesa
     given-names: Marco
-  - family-names: Kostić
+  - family-names: Kosti\u0107
     given-names: Dejan
 preferred-citation:
   type: generic
   title: "Taking Tokenization off the Host for Agentic LLM Serving"
   year: 2026
-  notes: "arXiv preprint"
+  notes: "arXiv preprint arXiv:2610.13325"
+  url: "https://arxiv.org/abs/2610.13325"
   authors:
     - family-names: Siavashi
       given-names: Mohammad
@@ -36,5 +37,5 @@ preferred-citation:
       name-suffix: Jr.
     - family-names: Chiesa
       given-names: Marco
-    - family-names: Kostić
+    - family-names: Kosti\u0107
       given-names: Dejan

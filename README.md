@@ -11,7 +11,7 @@
 
 **Website and docs:** https://msiavashi.github.io/GraphTok/
 
-GraphTok is a BPE tokenizer that runs end to end on an NVIDIA GPU. Pre-tokenization, BPE merging and output assembly are captured as one replayable CUDA graph, and token IDs are bit-identical to the reference tokenizers (`tiktoken` for GPT-2, Hugging Face `tokenizers` for the rest). Small inputs can be routed to a CPU engine, and a load-adaptive dispatcher batches concurrent requests into single graph replays. Repository: https://github.com/Msiavashi/GraphTok.
+GraphTok is a BPE tokenizer that runs end to end on an NVIDIA GPU. Pre-tokenization, BPE merging and output assembly are captured as one replayable CUDA graph, and token IDs are bit-identical to the reference tokenizer.
 
 - **Exact:** token IDs match the reference tokenizer bit for bit.
 - **Built for long contexts:** encodes 100k to 1M-token prompts in one graph replay.
@@ -22,7 +22,7 @@ Names: Python module `gpu_bpe_tokenizer`, C library `libgtok`, CLI `gpu_bpe_toke
 ## News
 
 - **2026-10** — v0.3.0, the first public release: GPU tokenizer, Python bindings, `libgtok` C ABI, vLLM plugin and NVIDIA Dynamo backend patch.
-- **2026-10** — Paper "Taking Tokenization off the Host for Agentic LLM Serving" on arXiv (arXiv link coming soon).
+- **2026-10** — Paper "Taking Tokenization off the Host for Agentic LLM Serving" on arXiv: https://arxiv.org/abs/2610.13325
 
 ## Supported tokenizers
 
@@ -85,7 +85,7 @@ arr = d.encode_numpy("Hello, world!")
 | Build for another GPU arch | `cmake --preset all -DCMAKE_CUDA_ARCHITECTURES=89` |
 | Build only `libgtok` | `cmake --build build/all -j --target gtok` |
 | Install the Python module | `pip install .` (tests: `pip install '.[test]'`) |
-| Download vocabularies | `python3 scripts/download-vocabs.py` (`--force` re-downloads) |
+| Download vocabularies | `python3 scripts/download-vocabs.py` (`--force` re-downloads`) |
 | Encode a file | `./build/all/gpu_bpe_tokenize --vocab <json> --input <txt> --output <bin>` |
 | Encode several files in one replay | `... --inputs a.txt,b.txt --output tokens.bin` |
 | Chat template with BOS | `... --vocab data/llama3_tokenizer.json --chat chat.json --add-bos --output tokens.bin` |
@@ -128,7 +128,7 @@ GBPE_VLLM=1 GBPE_GTOK_LIB=$PWD/build/qwen25/libgtok.so vllm serve Qwen/Qwen3-32B
 
 ## Development
 
-Development happens on the `develop` branch and pull requests target `develop`; `main` holds releases. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for the environment, tests and release process, and [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.
+Development happens on the `develop` branch and pull requests target `develop`; `main` holds releases. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for the environment, tests and release proces...
 
 ## Documentation
 
@@ -145,7 +145,11 @@ Development happens on the `develop` branch and pull requests target `develop`; 
   title={Taking Tokenization off the Host for Agentic {LLM} Serving},
   author={Siavashi, Mohammad and Schwinte, Pascal and Banaei, Ali and Maguire Jr., Gerald Q. and Chiesa, Marco and Kosti{\'c}, Dejan},
   year={2026},
-  note={arXiv preprint}
+  eprint={2610.13325},
+  archivePrefix={arXiv},
+  primaryClass={cs.CL},
+  url={https://arxiv.org/abs/2610.13325},
+  note={arXiv preprint arXiv:2610.13325}
 }
 ```
 
